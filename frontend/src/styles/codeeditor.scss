@@ -1,0 +1,59 @@
+.editor-panel,
+.editor-panel .monaco-editor,
+.editor-panel .monaco-editor .overflow-guard,
+.editor-panel .monaco-editor .monaco-scrollable-element,
+.editor-panel .monaco-editor-background {
+	border-radius: 0 !important;
+}
+
+.editor-panel {
+	display: flex;
+	flex-direction: column;
+	height: 100%;
+	min-height: 0;
+	background: var(--bg-editor);
+	color: var(--text-primary);
+}
+
+.editor-breadcrumbs {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	padding: var(--space-sm) var(--space-md);
+	font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial;
+	font-size: 12px;
+	color: var(--text-secondary);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.editor-panel .monaco-editor {
+	flex: 1 1 auto;
+	min-height: 0;
+}
+
+.editor-breadcrumb {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	min-width: 0;
+}
+
+.koda-icon {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	min-width: 1ch;
+	color: var(--text-secondary);
+}
+
+.editor-breadcrumb-icon,
+.editor-breadcrumb-separator {
+	opacity: 0.7;
+}
+
+.editor-breadcrumb-label {
+	overflow: hidden;
+	text-overflow: ellipsis;
+}

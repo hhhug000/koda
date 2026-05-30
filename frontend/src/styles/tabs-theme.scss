@@ -1,0 +1,97 @@
+/* Styles for nested GoldenLayout tabs inside .koda-nested-tabs */
+.koda-nested-tabs {
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial;
+
+  /* Remove outer spacing and rounding */
+  padding: 0 !important;
+  margin: 0 !important;
+
+  .lm_header { display: block !important; padding: 0 !important; margin: 0 !important; }
+
+  .lm_stack > .lm_header {
+    background: var(--bg-surface);
+    padding: 0 !important;
+    margin: 0 !important;
+    border-bottom: 1px solid var(--border-default);
+    border-radius: 0 !important;
+    box-sizing: border-box;
+    min-height: 30px; /* ensure header has enough height so tabs don't overlap content */
+  }
+
+  .lm_tabs {
+    display: flex !important;
+    gap: 0 !important;
+    align-items: center;
+    margin: 0;
+    padding: 0;
+  }
+
+  .lm_tab {
+    display: inline-flex;
+    align-items: center;
+    /* let title take remaining space so close sits at right */
+    gap: 10px;
+    padding: 7px 47px 7px 37px !important; /* more vertical and horizontal padding, keep right space for close */
+    border-radius: 0 !important;
+    background: transparent;
+    color: var(--text-secondary);
+    font-size: 13px;
+    cursor: pointer;
+    user-select: none;
+    margin: 0;
+    min-width: 0;
+  }
+
+  .lm_tab.lm_active {
+    background: var(--bg-editor);
+    color: var(--text-primary);
+    box-shadow: none;
+  }
+
+  .lm_tab .lm_title { display: inline-flex; align-items: center; gap: 8px; line-height: 1; overflow: hidden; text-overflow: ellipsis; flex: 1 1 auto; min-width: 0; }
+
+  /* Icon to the direct left of the label */
+  .lm_tab .lm_title::before {
+    content: "";
+    width: 14px;
+    height: 12px;
+    display: inline-block;
+    background-size: contain;
+    background-repeat: no-repeat;
+    background-position: center;
+    /* simple document SVG icon as data URI */
+    background-image: url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z'/%3E%3Cpath d='M14 2v6h6'/%3E%3C/svg%3E");
+    color: var(--text-secondary);
+    flex: 0 0 auto;
+  }
+
+  /* Close button inside a tab */
+  /* Move close button to the far right and style it */
+  /* GoldenLayout uses .lm_close_tab for the per-tab close control */
+  .lm_header .lm_tab .lm_close_tab {
+    opacity: 0.9;
+    color: var(--text-secondary);
+    position: absolute;
+    top: 50%;
+    right: 4px;
+    transform: translateY(-50%);
+    width: 16px;
+    height: 16px;
+    display: inline-block;
+    background-repeat: no-repeat;
+    background-position: center;
+    background-size: 14px 14px;
+    border: none;
+    background-color: transparent;
+    background-image: url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cline x1='18' y1='6' x2='6' y2='18'/%3E%3Cline x1='6' y1='6' x2='18' y2='18'/%3E%3C/svg%3E");
+  }
+  .lm_header .lm_tab .lm_close_tab:hover { opacity: 1; color: var(--text-primary); }
+
+  /* Ensure header has height, and center tabs vertically within it */
+  .lm_stack > .lm_header { display: flex; align-items: center; }
+  .lm_header .lm_tabs { height: 100%; align-items: center; }
+  .lm_header .lm_tab { position: relative; top: 0; transform: none; }
+
+  /* Ensure no rounding or extra spacing on header controls */
+  .lm_header .lm_controls { display: none !important; }
+}

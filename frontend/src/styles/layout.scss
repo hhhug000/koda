@@ -1,0 +1,25 @@
+/* Reset the default layout borders and headers (scope to main layout only) */
+.app-container > .gl-root .lm_root { background: var(--bg-primary); }
+.app-container > .gl-root .lm_splitter { background: var(--border-default) !important; }
+.app-container > .gl-root .lm_item { border-radius: var(--panel-radius); overflow: hidden; box-shadow: var(--shadow); }
+
+.lm_horizontal {
+	width: 2px !important;
+}
+.lm_vertical {
+	height: 2px !important;
+}
+
+.app-container > .gl-root .lm_header { display: none !important; }
+
+/* Only enable stack headers within the nested tabs container */
+.koda-nested-tabs .lm_stack > .lm_header { display: block !important; }
+.koda-nested-tabs .lm_stack .lm_tabs { display: flex !important; }
+
+/* Hide header-level control buttons globally; nested tabs keep per-tab close buttons */
+.app-container > .gl-root .lm_header .lm_controls { display: none !important; }
+.app-container > .gl-root .lm_header .lm_tabdropdown, .app-container > .gl-root .lm_header .lm_tabdropdown_list { display: none !important; }
+
+.app-container > .gl-root .lm_content {
+	background: var(--bg-surface);
+}
