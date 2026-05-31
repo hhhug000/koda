@@ -14,6 +14,34 @@ export const Layout = ({ config, components }) => {
   useEffect(() => {
     const layout = new GoldenLayout(config, containerRef.current);
 
+    let resizeHandle = 0;
+    const updateLayoutSize = () => {
+      if (!containerRef.current) {
+        return;
+      }
+
+      if (resizeHandle) {
+        cancelAnimationFrame(resizeHandle);
+      }
+
+      resizeHandle = requestAnimationFrame(() => {
+        if (!containerRef.current) {
+          return;
+        }
+
+        const { offsetWidth, offsetHeight } = containerRef.current;
+        const { width, height } = containerRef.current.getBoundingClientRect();
+        const nextWidth = offsetWidth || Math.ceil(width);
+        const nextHeight = offsetHeight || Math.ceil(height);
+
+        if (typeof layout.updateSize === 'function') {
+          layout.updateSize(nextWidth, nextHeight);
+        } else if (typeof layout.setSize === 'function') {
+          layout.setSize(nextWidth, nextHeight);
+        }
+      });
+    };
+
     Object.entries(components).forEach(([componentName, Component]) => {
       layout.registerComponent(componentName, (container, componentState) => {
         const mountPoint = document.createElement('div');
@@ -43,8 +71,28 @@ export const Layout = ({ config, components }) => {
     });
 
     layout.init();
-    return () => layout.destroy();
+    updateLayoutSize();
+
+    window.addEventListener('resize', updateLayoutSize);
+    const resizeObserver = typeof ResizeObserver !== 'undefined'
+      ? new ResizeObserver(updateLayoutSize)
+      : null;
+
+    if (resizeObserver && containerRef.current) {
+      resizeObserver.observe(containerRef.current);
+    }
+
+    return () => {
+      window.removeEventListener('resize', updateLayoutSize);
+      if (resizeObserver) {
+        resizeObserver.disconnect();
+      }
+      if (resizeHandle) {
+        cancelAnimationFrame(resizeHandle);
+      }
+      layout.destroy();
+    };
   }, [components, config]);
 
-  return <div ref={containerRef} className="gl-root" style={{ width: '100%', height: '100vh' }} />;
+  return <div ref={containerRef} className="gl-root" style={{ position: 'relative', width: '100%', height: '100%', boxSizing: 'border-box' }} />;
 };

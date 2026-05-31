@@ -1,8 +1,9 @@
 import { Layout } from './components/Layout';
 import MenuBar from './components/MenuBar'
 import './styles/main.scss';
-import CodeEditor from './components/CodeEditor';
 import Tabs from './components/Tabs';
+import useCommunicator from './components/Communicator';
+import useTheme from './hooks/useTheme';
 
 const LeftPanel = () => <div className="pane-content">Left Panel</div>;
 const MiddleEditor = ({ files, fileName }) => {
@@ -45,6 +46,18 @@ const components = {
 };
 
 function App() {
+  const { loading } = useTheme();
+
+  const handleMessage = (message) => {
+    console.log('App received message:', message);
+  };
+
+  useCommunicator(handleMessage);
+
+  if (loading) {
+    return <div>Loading theme...</div>;
+  }
+
   return (
     <div className="app-container">
       <MenuBar />

@@ -10,9 +10,14 @@
 	display: flex;
 	flex-direction: column;
 	height: 100%;
+	width: 100%;
 	min-height: 0;
-	background: var(--bg-editor);
+	min-width: 0;
+	max-height: 100%;
+	max-width: 100%;
 	color: var(--text-primary);
+	background-color: var(--bg-editor);
+	box-sizing: border-box;
 }
 
 .editor-breadcrumbs {
@@ -26,11 +31,29 @@
 	white-space: nowrap;
 	overflow: hidden;
 	text-overflow: ellipsis;
+	background-color: var(--bg-editor);
+	border-bottom: 1px solid var(--border-default);
+	flex-shrink: 0;
+	box-sizing: border-box;
 }
 
 .editor-panel .monaco-editor {
 	flex: 1 1 auto;
 	min-height: 0;
+	min-width: 0;
+	width: 100%;
+	height: 100%;
+	box-sizing: border-box;
+}
+
+.editor-panel > div:last-child {
+	flex: 1 1 auto;
+	min-height: 0;
+	min-width: 0;
+	width: 100%;
+	height: 100%;
+	display: flex;
+	box-sizing: border-box;
 }
 
 .editor-breadcrumb {

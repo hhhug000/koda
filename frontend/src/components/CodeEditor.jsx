@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect, useRef } from 'react';
 import Editor from '@monaco-editor/react';
 import { parse } from '@babel/parser';
 import { Icon } from './Icon';
@@ -193,6 +193,24 @@ function buildBreadcrumbs(code, cursorPosition, fileName) {
 function CodeEditor({ fileName = 'App.jsx', initialCode = DEFAULT_CODE }) {
     const [source, setSource] = useState(initialCode);
     const [cursorPosition, setCursorPosition] = useState(null);
+    const editorRef = useRef(null);
+    const themeDataRef = useRef(null);
+
+    // Load the Monaco theme data once on mount
+    useEffect(() => {
+        const loadTheme = async () => {
+            try {
+                const response = await fetch('http://localhost:5174/api/theme/default/monaco');
+                const themeData = await response.json();
+                themeDataRef.current = themeData;
+                console.log('Monaco theme data loaded');
+            } catch (error) {
+                console.error('Failed to load Monaco theme:', error);
+            }
+        };
+
+        loadTheme();
+    }, []);
 
     const breadcrumbs = useMemo(() => buildBreadcrumbs(source, cursorPosition, fileName), [source, cursorPosition, fileName]);
 
@@ -203,10 +221,19 @@ function CodeEditor({ fileName = 'App.jsx', initialCode = DEFAULT_CODE }) {
         automaticLayout: true
     }), []);
 
-    const handleMount = (editor) => {
-        setCursorPosition(editor.getPosition());
+    const handleBeforeMount = (monaco) => {
+        // Define theme before editor mounts if data is available
+        if (themeDataRef.current) {
+            monaco.editor.defineTheme('koda-theme', themeDataRef.current);
+            console.log('Monaco theme defined in beforeMount');
+        }
+    };
 
-        editor.onDidChangeCursorPosition((event) => {
+    const handleMount = (editorInstance) => {
+        editorRef.current = editorInstance;
+        setCursorPosition(editorInstance.getPosition());
+
+        editorInstance.onDidChangeCursorPosition((event) => {
             setCursorPosition(event.position);
         });
     };
@@ -222,14 +249,19 @@ function CodeEditor({ fileName = 'App.jsx', initialCode = DEFAULT_CODE }) {
                     </span>
                 ))}
             </div>
-            <Editor
-                height="100%"
-                defaultLanguage="javascript"
-                value={source}
-                onChange={(nextValue) => setSource(nextValue ?? '')}
-                onMount={handleMount}
-                options={editorOptions}
-            />
+            <div style={{ flex: '1 1 auto', minHeight: 0, minWidth: 0, width: '100%', height: '100%' }}>
+                <Editor
+                    height="100%"
+                    width="100%"
+                    defaultLanguage="javascript"
+                    value={source}
+                    onChange={(nextValue) => setSource(nextValue ?? '')}
+                    onMount={handleMount}
+                    beforeMount={handleBeforeMount}
+                    options={editorOptions}
+                    theme="koda-theme"
+                />
+            </div>
         </div>
     );
 }
