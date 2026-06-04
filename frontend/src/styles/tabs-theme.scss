@@ -12,7 +12,7 @@
     background: var(--bg-surface);
     padding: 0 !important;
     margin: 0 !important;
-    border-bottom: 1px solid var(--border-default);
+    border-bottom: 2px solid var(--border-default);
     border-radius: 0 !important;
     box-sizing: border-box;
     min-height: 30px; /* ensure header has enough height so tabs don't overlap content */
@@ -45,6 +45,11 @@
   .lm_tab.lm_active {
     background: var(--bg-editor);
     color: var(--text-primary);
+    margin-bottom: -2px;
+    border-bottom: 2px solid var(--bg-editor);
+    border-top: 2px solid var(--accent-soft);
+    position: relative;
+    z-index: 1;
     box-shadow: none;
   }
 
