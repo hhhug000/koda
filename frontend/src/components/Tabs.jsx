@@ -9,7 +9,8 @@ function Tabs({ files = [{ fileName: 'App.jsx' }, { fileName: 'Other.jsx' }] }) 
   const wrapperRef = useRef(null);
 
   useEffect(() => {
-    const hasFiles = files.length > 0;
+    // Keep track whether files exist (not used directly but informative)
+    // const hasFiles = files.length > 0;
     // Always include an `emptyState` component in the stack so the
     // layout never removes the stack when user tabs are closed. We'll
     // visually hide its tab when real files exist.
@@ -56,7 +57,7 @@ function Tabs({ files = [{ fileName: 'App.jsx' }, { fileName: 'Other.jsx' }] }) 
       container.getElement().appendChild(mountPoint);
       const root = createRoot(mountPoint);
 
-      root.render(<CodeEditor fileName={componentState.fileName} />);
+      root.render(<CodeEditor fileName={componentState.fileName} filePath={componentState.filePath} />);
 
       container.on('destroy', () => {
         setTimeout(() => root.unmount(), 0);
@@ -78,6 +79,59 @@ function Tabs({ files = [{ fileName: 'App.jsx' }, { fileName: 'Other.jsx' }] }) 
     });
 
     layout.init();
+
+    // Handle external open-file requests (dispatched as a CustomEvent on window)
+    const handleOpenFile = (ev) => {
+      try {
+        const detail = ev?.detail ?? {};
+        const filePath = detail.filePath || detail.path || null;
+        const fileName = detail.fileName || (filePath ? filePath.split('/').pop() : 'untitled');
+        if (!filePath) return;
+
+        // Find the primary stack in the layout and add a new child
+        const rootItem = layout.root;
+        let stack = null;
+        try {
+          if (rootItem && typeof rootItem.getItemsByType === 'function') {
+            const stacks = rootItem.getItemsByType('stack');
+            if (Array.isArray(stacks) && stacks.length > 0) stack = stacks[0];
+          }
+        } catch {
+          // ignore
+        }
+
+        if (!stack && rootItem && Array.isArray(rootItem.contentItems)) {
+          for (const it of rootItem.contentItems) {
+            if (it && (it.isStack || it.type === 'stack')) {
+              stack = it; break;
+            }
+          }
+        }
+
+        if (!stack) return;
+
+        stack.addChild({
+          type: 'component',
+          componentName: 'nestedEditor',
+          title: fileName,
+          componentState: { fileName, filePath },
+          isClosable: true
+        });
+
+        // give layout a tick to update sizes
+        setTimeout(() => {
+          try {
+            if (typeof layout.updateSize === 'function') layout.updateSize();
+          } catch {
+            // ignore
+          }
+        }, 50);
+      } catch (e) {
+        // ignore
+      }
+    };
+
+    window.addEventListener('koda.open-file', handleOpenFile);
 
     const hideEmptyTabElement = () => {
       if (!containerRef.current) return;
@@ -164,6 +218,7 @@ function Tabs({ files = [{ fileName: 'App.jsx' }, { fileName: 'Other.jsx' }] }) 
     }
 
     return () => {
+      window.removeEventListener('koda.open-file', handleOpenFile);
       mutationObserver.disconnect();
       tabMutationObserver.disconnect();
       window.removeEventListener('resize', updateLayoutSize);

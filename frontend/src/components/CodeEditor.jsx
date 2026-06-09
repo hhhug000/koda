@@ -190,7 +190,7 @@ function buildBreadcrumbs(code, cursorPosition, fileName) {
     return breadcrumbs;
 }
 
-function CodeEditor({ fileName = 'App.jsx', initialCode = DEFAULT_CODE }) {
+function CodeEditor({ fileName = 'App.jsx', initialCode = DEFAULT_CODE, filePath = null }) {
     const [source, setSource] = useState(initialCode);
     const [cursorPosition, setCursorPosition] = useState(null);
     const editorRef = useRef(null);
@@ -211,6 +211,51 @@ function CodeEditor({ fileName = 'App.jsx', initialCode = DEFAULT_CODE }) {
 
         loadTheme();
     }, []);
+
+    // Resolve a backend API URL similar to Explorer (prefer VITE_API_BASE)
+    function resolveApiUrl(apiPath) {
+        const DEFAULT_BACKEND_PORT = '5174';
+        const baseFromEnv = import.meta.env?.VITE_API_BASE;
+        if (baseFromEnv) {
+            return `${baseFromEnv.replace(/\/$/, '')}${apiPath.startsWith('/') ? apiPath : `/${apiPath}`}`;
+        }
+
+        try {
+            const loc = window.location;
+            if (String(loc.port) === DEFAULT_BACKEND_PORT || loc.origin.includes(`:${DEFAULT_BACKEND_PORT}`)) {
+                return apiPath;
+            }
+            return `${loc.protocol}//${loc.hostname}:${DEFAULT_BACKEND_PORT}${apiPath.startsWith('/') ? apiPath : `/${apiPath}`}`;
+        } catch {
+            return apiPath;
+        }
+    }
+
+    // If a filePath is provided, fetch the file contents from the backend.
+    useEffect(() => {
+        if (!filePath) return undefined;
+
+        let cancelled = false;
+        (async () => {
+            try {
+                const url = resolveApiUrl(`/api/fs/file?path=${encodeURIComponent(filePath)}`);
+                const res = await fetch(url, { cache: 'no-store' });
+                if (!res.ok) {
+                    const text = await res.text().catch(() => '');
+                    setSource(`// Failed to load file (${res.status}): ${text}`);
+                    return;
+                }
+
+                const contentType = (res.headers.get('content-type') || '').toLowerCase();
+                const text = await res.text();
+                if (!cancelled) setSource(text ?? '');
+            } catch (err) {
+                if (!cancelled) setSource(`// Error loading file: ${String(err)}`);
+            }
+        })();
+
+        return () => { cancelled = true; };
+    }, [filePath]);
 
     const breadcrumbs = useMemo(() => buildBreadcrumbs(source, cursorPosition, fileName), [source, cursorPosition, fileName]);
 

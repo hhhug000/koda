@@ -9,6 +9,7 @@ import json
 import os
 import sys
 from pathlib import Path
+from typing import List, Dict, Any
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -333,6 +334,84 @@ async def websocket_endpoint(websocket: WebSocket):
         logger.error(f"WebSocket error: {e}")
     finally:
         manager.disconnect(websocket)
+
+
+@app.get("/api/fs/tree")
+async def get_fs_tree(path: str = None, max_depth: int = 5):
+    """Return a JSON representation of the file tree rooted at `path`.
+
+    - If `path` is not provided, use the current working directory.
+    - Respects a default `max_depth` to avoid huge responses.
+    - Excludes `node_modules`, `.git`, and `__pycache__` directories.
+    """
+    EXCLUDE = {"node_modules", ".git", "__pycache__"}
+
+    try:
+        root = Path(path) if path else Path.cwd()
+        root = root.resolve()
+    except Exception:
+        return {"error": "invalid path"}, 400
+
+    def build_tree(p: Path, depth: int) -> Dict[str, Any]:
+        node: Dict[str, Any] = {
+            "name": p.name,
+            "path": str(p),
+            "type": "dir" if p.is_dir() else "file"
+        }
+        if p.is_dir():
+            node_children: List[Dict[str, Any]] = []
+            if depth <= 0:
+                node["children"] = []
+                return node
+
+            try:
+                for child in sorted(p.iterdir(), key=lambda x: (not x.is_dir(), x.name.lower())):
+                    if child.name in EXCLUDE:
+                        continue
+                    # skip symlink loops
+                    try:
+                        if child.is_dir():
+                            node_children.append(build_tree(child, depth - 1))
+                        else:
+                            node_children.append({"name": child.name, "path": str(child), "type": "file"})
+                    except Exception:
+                        # ignore unreadable entries
+                        continue
+            except Exception:
+                node_children = []
+
+            node["children"] = node_children
+
+        return node
+
+    tree = build_tree(root, int(max_depth))
+    return tree
+
+
+@app.get("/api/fs/file")
+async def get_fs_file(path: str):
+    """Return the text contents of a file at `path`.
+
+    - `path` must point to a readable file on disk.
+    - Returns plain text (UTF-8) or an error object with an HTTP status.
+    """
+    from fastapi.responses import PlainTextResponse
+
+    try:
+        p = Path(path)
+        # Resolve and guard a bit
+        p = p.resolve()
+        if not p.exists() or not p.is_file():
+            return {"error": "file not found"}, 404
+
+        # Read file as text
+        with open(p, 'r', encoding='utf-8') as f:
+            content = f.read()
+
+        return PlainTextResponse(content, media_type='text/plain; charset=utf-8')
+    except Exception as e:
+        logger.exception(f"Failed to read file {path}: {e}")
+        return {"error": str(e)}, 500
 
 def run_server(config):
     """Run the FastAPI server"""

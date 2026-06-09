@@ -5,7 +5,13 @@ import Tabs from './components/Tabs';
 import useCommunicator from './components/Communicator';
 import useTheme from './hooks/useTheme';
 
-const LeftPanel = () => <div className="pane-content">Left Panel</div>;
+import Explorer from './components/Explorer';
+
+const LeftPanel = () => (
+  <div className="pane-content" style={{ padding: 0 }}>
+    <Explorer />
+  </div>
+);
 const MiddleEditor = ({ files, fileName }) => {
   const filesProp = files ?? [{ fileName: fileName ?? 'App.jsx' }, { fileName: 'Other.jsx' }];
   return <Tabs files={filesProp} />;

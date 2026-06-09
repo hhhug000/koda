@@ -2,6 +2,8 @@ import * as Lucide from 'lucide-react';
 
 const ICON_MAP = {
   file: 'File',
+  folder: 'Folder',
+  'folder-open': 'Folder',
   array: 'List',
   object: 'Box',
   function: 'Code',
