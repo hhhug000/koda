@@ -7,7 +7,14 @@ function FileRow({ node, depth = 0, onToggle, defaultOpen = false }) {
   const [open, setOpen] = useState(defaultOpen);
 
   const toggle = () => {
-    if (!isDir) return;
+    if (!isDir) {
+      window.dispatchEvent(
+        new CustomEvent('koda.open-file', {
+          detail: { filePath: node.path, fileName: node.name }
+        })
+      );
+      return;
+    }
     const next = !open;
     setOpen(next);
     if (onToggle) onToggle(node, next);

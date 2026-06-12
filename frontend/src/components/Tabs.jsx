@@ -89,34 +89,59 @@ function Tabs({ files = [{ fileName: 'App.jsx' }, { fileName: 'Other.jsx' }] }) 
         if (!filePath) return;
 
         // Find the primary stack in the layout and add a new child
-        const rootItem = layout.root;
+        const rootItem = layout.rootItem || layout.root;
         let stack = null;
-        try {
-          if (rootItem && typeof rootItem.getItemsByType === 'function') {
-            const stacks = rootItem.getItemsByType('stack');
-            if (Array.isArray(stacks) && stacks.length > 0) stack = stacks[0];
-          }
-        } catch {
-          // ignore
-        }
-
-        if (!stack && rootItem && Array.isArray(rootItem.contentItems)) {
-          for (const it of rootItem.contentItems) {
-            if (it && (it.isStack || it.type === 'stack')) {
-              stack = it; break;
+        const findStack = (item) => {
+          if (!item) return null;
+          if (item.type === 'stack' || item.isStack) return item;
+          if (Array.isArray(item.contentItems)) {
+            for (const child of item.contentItems) {
+              const found = findStack(child);
+              if (found) return found;
             }
           }
-        }
+          return null;
+        };
+        stack = findStack(rootItem);
 
         if (!stack) return;
 
-        stack.addChild({
+        // Check if the file is already open in the stack
+        const existingChild = (stack.contentItems || []).find((child) => {
+          if (child.isComponent) {
+            const container = child.container;
+            const state = container ? (container.state || container.initialState) : null;
+            return state && state.filePath === filePath;
+          }
+          return false;
+        });
+
+        if (existingChild) {
+          if (typeof stack.setActiveComponentItem === 'function') {
+            stack.setActiveComponentItem(existingChild, true, false);
+          } else if (typeof existingChild.focus === 'function') {
+            existingChild.focus();
+          }
+          return;
+        }
+
+        const childItem = layout.newItem({
           type: 'component',
-          componentName: 'nestedEditor',
+          componentType: 'nestedEditor',
           title: fileName,
           componentState: { fileName, filePath },
           isClosable: true
         });
+
+        stack.addChild(childItem);
+
+        if (childItem) {
+          if (typeof stack.setActiveComponentItem === 'function') {
+            stack.setActiveComponentItem(childItem, true, false);
+          } else if (typeof childItem.focus === 'function') {
+            childItem.focus();
+          }
+        }
 
         // give layout a tick to update sizes
         setTimeout(() => {
@@ -127,7 +152,7 @@ function Tabs({ files = [{ fileName: 'App.jsx' }, { fileName: 'Other.jsx' }] }) 
           }
         }, 50);
       } catch (e) {
-        // ignore
+        console.error('Error opening file in Tabs:', e);
       }
     };
 

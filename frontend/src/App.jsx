@@ -13,7 +13,7 @@ const LeftPanel = () => (
   </div>
 );
 const MiddleEditor = ({ files, fileName }) => {
-  const filesProp = files ?? [{ fileName: fileName ?? 'App.jsx' }, { fileName: 'Other.jsx' }];
+  const filesProp = files ?? [];
   return <Tabs files={filesProp} />;
 };
 const MiddleTopB = () => <div className="pane-content">Middle Top — Tab B</div>;
@@ -33,7 +33,7 @@ const layoutConfig = {
           {
             type: 'component',
             componentName: 'midEditor',
-            componentState: { files: [{ fileName: 'App.jsx' }, { fileName: 'Other.jsx' }] },
+            componentState: { files: [] },
             height: 50
           },
           { type: 'component', componentName: 'midTopB', height: 50 }
