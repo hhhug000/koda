@@ -3,6 +3,7 @@ import Editor from '@monaco-editor/react';
 import { parse } from '@babel/parser';
 import { Icon } from './Icon';
 import '../styles/codeeditor.scss';
+import KEYBINDS from '../config/keybinds';
 
 const EXTENSION_TO_LANGUAGE = {
     js: 'javascript',
@@ -249,11 +250,32 @@ function buildBreadcrumbs(code, cursorPosition, fileName) {
     return breadcrumbs;
 }
 
+function parseMonacoKeybind(monaco, combo) {
+    const parts = combo.split('+').map(p => p.trim());
+    let result = 0;
+    for (const part of parts) {
+        const lower = part.toLowerCase();
+        if (lower === 'ctrl' || lower === 'cmd') result |= monaco.KeyMod.CtrlCmd;
+        else if (lower === 'shift') result |= monaco.KeyMod.Shift;
+        else if (lower === 'alt') result |= monaco.KeyMod.Alt;
+        else {
+            const upper = part.toUpperCase();
+            const code = monaco.KeyCode[`Key${upper}`];
+            if (code !== undefined) result |= code;
+        }
+    }
+    return result;
+}
+
 function CodeEditor({ fileName = 'App.jsx', initialCode = DEFAULT_CODE, filePath = null }) {
     const [source, setSource] = useState(initialCode);
     const [cursorPosition, setCursorPosition] = useState(null);
     const editorRef = useRef(null);
     const themeDataRef = useRef(null);
+    const savedSourceRef = useRef(initialCode);
+    const isDirtyRef = useRef(false);
+    const monacoRef = useRef(null);
+    const saveFileRef = useRef(null);
 
     // Load the Monaco theme data once on mount
     useEffect(() => {
@@ -290,6 +312,40 @@ function CodeEditor({ fileName = 'App.jsx', initialCode = DEFAULT_CODE, filePath
         }
     }
 
+    saveFileRef.current = async () => {
+        if (!filePath || !editorRef.current) return;
+        const content = editorRef.current.getValue();
+        try {
+            const res = await fetch(resolveApiUrl('/api/fs/file'), {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ path: filePath, content }),
+            });
+            if (res.ok) {
+                savedSourceRef.current = content;
+                isDirtyRef.current = false;
+                window.dispatchEvent(new CustomEvent('koda.dirty-changed', {
+                    detail: { filePath, fileName, isDirty: false }
+                }));
+            }
+        } catch (err) {
+            console.error('Failed to save file:', err);
+        }
+    };
+
+    const handleChange = (nextValue) => {
+        const val = nextValue ?? '';
+        setSource(val);
+        if (!filePath) return;
+        const dirty = val !== savedSourceRef.current;
+        if (dirty !== isDirtyRef.current) {
+            isDirtyRef.current = dirty;
+            window.dispatchEvent(new CustomEvent('koda.dirty-changed', {
+                detail: { filePath, fileName, isDirty: dirty }
+            }));
+        }
+    };
+
     // If a filePath is provided, fetch the file contents from the backend.
     useEffect(() => {
         if (!filePath) return undefined;
@@ -305,9 +361,16 @@ function CodeEditor({ fileName = 'App.jsx', initialCode = DEFAULT_CODE, filePath
                     return;
                 }
 
-                const contentType = (res.headers.get('content-type') || '').toLowerCase();
                 const text = await res.text();
-                if (!cancelled) setSource(text ?? '');
+                if (!cancelled) {
+                    const val = text ?? '';
+                    setSource(val);
+                    savedSourceRef.current = val;
+                    isDirtyRef.current = false;
+                    window.dispatchEvent(new CustomEvent('koda.dirty-changed', {
+                        detail: { filePath, fileName, isDirty: false }
+                    }));
+                }
             } catch (err) {
                 if (!cancelled) setSource(`// Error loading file: ${String(err)}`);
             }
@@ -326,20 +389,24 @@ function CodeEditor({ fileName = 'App.jsx', initialCode = DEFAULT_CODE, filePath
     }), []);
 
     const handleBeforeMount = (monaco) => {
-        // Define theme before editor mounts if data is available
+        monacoRef.current = monaco;
         if (themeDataRef.current) {
             monaco.editor.defineTheme('koda-theme', themeDataRef.current);
-            console.log('Monaco theme defined in beforeMount');
         }
     };
 
-    const handleMount = (editorInstance) => {
+    const handleMount = (editorInstance, monaco) => {
         editorRef.current = editorInstance;
         setCursorPosition(editorInstance.getPosition());
 
         editorInstance.onDidChangeCursorPosition((event) => {
             setCursorPosition(event.position);
         });
+
+        editorInstance.addCommand(
+            parseMonacoKeybind(monaco, KEYBINDS.SAVE),
+            () => saveFileRef.current?.()
+        );
     };
 
     return (
@@ -359,7 +426,7 @@ function CodeEditor({ fileName = 'App.jsx', initialCode = DEFAULT_CODE, filePath
                     width="100%"
                     language={getLanguageFromFileName(fileName)}
                     value={source}
-                    onChange={(nextValue) => setSource(nextValue ?? '')}
+                    onChange={handleChange}
                     onMount={handleMount}
                     beforeMount={handleBeforeMount}
                     options={editorOptions}

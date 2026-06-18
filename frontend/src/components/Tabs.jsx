@@ -7,6 +7,7 @@ function Tabs({ files = [{ fileName: 'App.jsx' }, { fileName: 'Other.jsx' }] }) 
   const containerRef = useRef(null);
   const layoutRef = useRef(null);
   const wrapperRef = useRef(null);
+  const containerMapRef = useRef(new Map()); // filePath -> { container, fileName }
 
   useEffect(() => {
     // Keep track whether files exist (not used directly but informative)
@@ -51,15 +52,19 @@ function Tabs({ files = [{ fileName: 'App.jsx' }, { fileName: 'Other.jsx' }] }) 
     layoutRef.current = layout;
 
     layout.registerComponent('nestedEditor', (container, componentState) => {
+      const { filePath, fileName } = componentState;
+      if (filePath) containerMapRef.current.set(filePath, { container, fileName });
+
       const mountPoint = document.createElement('div');
       mountPoint.style.width = '100%';
       mountPoint.style.height = '100%';
       container.getElement().appendChild(mountPoint);
       const root = createRoot(mountPoint);
 
-      root.render(<CodeEditor fileName={componentState.fileName} filePath={componentState.filePath} />);
+      root.render(<CodeEditor fileName={fileName} filePath={filePath} />);
 
       container.on('destroy', () => {
+        if (filePath) containerMapRef.current.delete(filePath);
         setTimeout(() => root.unmount(), 0);
       });
     });
@@ -158,6 +163,19 @@ function Tabs({ files = [{ fileName: 'App.jsx' }, { fileName: 'Other.jsx' }] }) 
 
     window.addEventListener('koda.open-file', handleOpenFile);
 
+    const handleDirtyChanged = (ev) => {
+      const { filePath, fileName, isDirty } = ev?.detail ?? {};
+      if (!filePath) return;
+      const entry = containerMapRef.current.get(filePath);
+      if (!entry) return;
+      try {
+        entry.container.setTitle(isDirty ? `● ${fileName}` : fileName);
+      } catch {
+        // ignore if GL version doesn't support setTitle
+      }
+    };
+    window.addEventListener('koda.dirty-changed', handleDirtyChanged);
+
     const hideEmptyTabElement = () => {
       if (!containerRef.current) return;
 
@@ -244,6 +262,8 @@ function Tabs({ files = [{ fileName: 'App.jsx' }, { fileName: 'Other.jsx' }] }) 
 
     return () => {
       window.removeEventListener('koda.open-file', handleOpenFile);
+      window.removeEventListener('koda.dirty-changed', handleDirtyChanged);
+      containerMapRef.current.clear();
       mutationObserver.disconnect();
       tabMutationObserver.disconnect();
       window.removeEventListener('resize', updateLayoutSize);

@@ -1,6 +1,6 @@
 import asyncio
 import webview
-from fastapi import FastAPI, WebSocket, Body
+from fastapi import FastAPI, WebSocket, Body, Request
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 import logging
@@ -412,6 +412,26 @@ async def get_fs_file(path: str):
     except Exception as e:
         logger.exception(f"Failed to read file {path}: {e}")
         return {"error": str(e)}, 500
+
+@app.put("/api/fs/file")
+async def put_fs_file(request: Request):
+    """Overwrite the text content of an existing file at `path`."""
+    try:
+        body = await request.json()
+        path = body.get("path")
+        content = body.get("content", "")
+        if not path:
+            return {"error": "path is required"}
+        p = Path(path).resolve()
+        if not p.exists() or not p.is_file():
+            return {"error": "file not found"}
+        with open(p, 'w', encoding='utf-8') as f:
+            f.write(content)
+        return {"success": True}
+    except Exception as e:
+        logger.exception(f"Failed to write file: {e}")
+        return {"error": str(e)}
+
 
 def run_server(config):
     """Run the FastAPI server"""
