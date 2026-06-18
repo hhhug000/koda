@@ -4,6 +4,65 @@ import { parse } from '@babel/parser';
 import { Icon } from './Icon';
 import '../styles/codeeditor.scss';
 
+const EXTENSION_TO_LANGUAGE = {
+    js: 'javascript',
+    jsx: 'javascript',
+    mjs: 'javascript',
+    cjs: 'javascript',
+    ts: 'typescript',
+    tsx: 'typescript',
+    mts: 'typescript',
+    css: 'css',
+    scss: 'scss',
+    sass: 'scss',
+    less: 'less',
+    html: 'html',
+    htm: 'html',
+    xml: 'xml',
+    svg: 'xml',
+    json: 'json',
+    jsonc: 'json',
+    md: 'markdown',
+    markdown: 'markdown',
+    py: 'python',
+    rb: 'ruby',
+    go: 'go',
+    rs: 'rust',
+    java: 'java',
+    c: 'c',
+    h: 'c',
+    cpp: 'cpp',
+    cc: 'cpp',
+    cxx: 'cpp',
+    hpp: 'cpp',
+    cs: 'csharp',
+    php: 'php',
+    swift: 'swift',
+    kt: 'kotlin',
+    kts: 'kotlin',
+    yaml: 'yaml',
+    yml: 'yaml',
+    sh: 'shell',
+    bash: 'shell',
+    zsh: 'shell',
+    ps1: 'powershell',
+    sql: 'sql',
+    r: 'r',
+    lua: 'lua',
+    dockerfile: 'dockerfile',
+    toml: 'ini',
+    ini: 'ini',
+    vue: 'html',
+};
+
+function getLanguageFromFileName(name) {
+    if (!name) return 'plaintext';
+    const lower = name.toLowerCase();
+    if (lower === 'dockerfile') return 'dockerfile';
+    const ext = lower.split('.').pop();
+    return EXTENSION_TO_LANGUAGE[ext] ?? 'plaintext';
+}
+
 const ICON_NAMES = {
     file: 'file',
     function: 'function',
@@ -298,7 +357,7 @@ function CodeEditor({ fileName = 'App.jsx', initialCode = DEFAULT_CODE, filePath
                 <Editor
                     height="100%"
                     width="100%"
-                    defaultLanguage="javascript"
+                    language={getLanguageFromFileName(fileName)}
                     value={source}
                     onChange={(nextValue) => setSource(nextValue ?? '')}
                     onMount={handleMount}
