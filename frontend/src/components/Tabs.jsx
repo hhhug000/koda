@@ -85,6 +85,28 @@ function Tabs({ files = [{ fileName: 'App.jsx' }, { fileName: 'Other.jsx' }] }) 
 
     layout.init();
 
+    // Dispatch koda.active-file-changed whenever GL switches the active tab
+    // (covers tab clicks and tab closes)
+    const dispatchActiveFile = (activeItem) => {
+      try {
+        const container = activeItem?.container;
+        const state = container?.state ?? container?.initialState;
+        const filePath = state?.filePath ?? null;
+        window.dispatchEvent(new CustomEvent('koda.active-file-changed', { detail: { filePath } }));
+      } catch { /* ignore */ }
+    };
+
+    const attachStackListener = (item) => {
+      if (!item) return;
+      if (item.type === 'stack' || item.isStack) {
+        item.on('activeContentItemChanged', dispatchActiveFile);
+      }
+      if (Array.isArray(item.contentItems)) {
+        item.contentItems.forEach(attachStackListener);
+      }
+    };
+    attachStackListener(layout.rootItem || layout.root);
+
     // Handle external open-file requests (dispatched as a CustomEvent on window)
     const handleOpenFile = (ev) => {
       try {

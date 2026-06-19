@@ -1,4 +1,5 @@
 import asyncio
+import shutil
 import webview
 from fastapi import FastAPI, WebSocket, Body, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -431,6 +432,104 @@ async def put_fs_file(request: Request):
     except Exception as e:
         logger.exception(f"Failed to write file: {e}")
         return {"error": str(e)}
+
+
+@app.delete("/api/fs/item")
+async def delete_fs_item(path: str):
+    """Delete a file or directory (directories are removed recursively)."""
+    try:
+        p = Path(path).resolve()
+        if not p.exists():
+            return {"error": "path does not exist"}, 404
+        if p.is_dir():
+            shutil.rmtree(p)
+        else:
+            p.unlink()
+        return {"success": True}
+    except Exception as e:
+        logger.exception(f"Failed to delete {path}: {e}")
+        return {"error": str(e)}, 500
+
+
+@app.post("/api/fs/rename")
+async def rename_fs_item(request: Request):
+    """Rename a file or directory. Body: { path, new_name }."""
+    try:
+        body = await request.json()
+        old_path = Path(body["path"]).resolve()
+        new_name = body.get("new_name", "").strip()
+        if not new_name:
+            return {"error": "new_name is required"}, 400
+        if "/" in new_name or "\\" in new_name:
+            return {"error": "new_name must not contain path separators"}, 400
+        if not old_path.exists():
+            return {"error": "path does not exist"}, 404
+        new_path = old_path.parent / new_name
+        old_path.rename(new_path)
+        return {"success": True, "new_path": str(new_path)}
+    except Exception as e:
+        logger.exception(f"Failed to rename: {e}")
+        return {"error": str(e)}, 500
+
+
+@app.post("/api/fs/copy")
+async def copy_fs_item(request: Request):
+    """Copy a file or directory into dest_dir. Body: { src, dest_dir }.
+    Auto-generates a unique name if the destination already exists."""
+    try:
+        body = await request.json()
+        src = Path(body["src"]).resolve()
+        dest_dir = Path(body["dest_dir"]).resolve()
+        if not src.exists():
+            return {"error": "source does not exist"}, 404
+        dest = dest_dir / src.name
+        if dest.exists():
+            stem = src.stem if src.is_file() else src.name
+            suffix = src.suffix if src.is_file() else ""
+            counter = 2
+            while dest.exists():
+                dest = dest_dir / f"{stem} copy {counter}{suffix}"
+                counter += 1
+        if src.is_dir():
+            shutil.copytree(src, dest)
+        else:
+            shutil.copy2(src, dest)
+        return {"success": True, "dest": str(dest)}
+    except Exception as e:
+        logger.exception(f"Failed to copy: {e}")
+        return {"error": str(e)}, 500
+
+
+@app.post("/api/fs/duplicate")
+async def duplicate_fs_item(request: Request):
+    """Duplicate a file or directory next to the original. Body: { path }."""
+    try:
+        body = await request.json()
+        src = Path(body["path"]).resolve()
+        if not src.exists():
+            return {"error": "path does not exist"}, 404
+        parent = src.parent
+        if src.is_file():
+            stem = src.stem
+            suffix = src.suffix
+            dest = parent / f"{stem} copy{suffix}"
+            counter = 2
+            while dest.exists():
+                dest = parent / f"{stem} copy {counter}{suffix}"
+                counter += 1
+            shutil.copy2(src, dest)
+        else:
+            name = src.name
+            dest = parent / f"{name} copy"
+            counter = 2
+            while dest.exists():
+                dest = parent / f"{name} copy {counter}"
+                counter += 1
+            shutil.copytree(src, dest)
+        return {"success": True, "dest": str(dest)}
+    except Exception as e:
+        logger.exception(f"Failed to duplicate: {e}")
+        return {"error": str(e)}, 500
 
 
 def run_server(config):

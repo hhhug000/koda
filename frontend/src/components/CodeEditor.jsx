@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect, useRef } from 'react';
+import { useMemo, useState, useEffect, useRef, useCallback } from 'react';
 import Editor from '@monaco-editor/react';
 import { parse } from '@babel/parser';
 import { Icon } from './Icon';
@@ -385,7 +385,8 @@ function CodeEditor({ fileName = 'App.jsx', initialCode = DEFAULT_CODE, filePath
         minimap: { enabled: true },
         scrollBeyondLastLine: false,
         fontSize: 14,
-        automaticLayout: true
+        automaticLayout: true,
+        contextmenu: false,
     }), []);
 
     const handleBeforeMount = (monaco) => {
@@ -394,6 +395,26 @@ function CodeEditor({ fileName = 'App.jsx', initialCode = DEFAULT_CODE, filePath
             monaco.editor.defineTheme('koda-theme', themeDataRef.current);
         }
     };
+
+    const contextMenuFiredRef = useRef(false);
+
+    const buildEditorMenuItems = useCallback((editor) => {
+        const t = (id) => () => editor.trigger('menu', id, null);
+        const items = [
+            { label: 'Cut',        action: t('editor.action.clipboardCutAction') },
+            { label: 'Copy',       action: t('editor.action.clipboardCopyAction') },
+            { label: 'Paste',      action: t('editor.action.clipboardPasteAction') },
+            { label: 'Select All', action: t('editor.action.selectAll') },
+            null,
+            { label: 'Undo', action: t('undo') },
+            { label: 'Redo', action: t('redo') },
+        ];
+        if (filePath) {
+            items.push(null);
+            items.push({ label: 'Save', action: () => saveFileRef.current?.() });
+        }
+        return items;
+    }, [filePath]);
 
     const handleMount = (editorInstance, monaco) => {
         editorRef.current = editorInstance;
@@ -407,10 +428,29 @@ function CodeEditor({ fileName = 'App.jsx', initialCode = DEFAULT_CODE, filePath
             parseMonacoKeybind(monaco, KEYBINDS.SAVE),
             () => saveFileRef.current?.()
         );
+
+        editorInstance.onContextMenu((e) => {
+            contextMenuFiredRef.current = true;
+            setTimeout(() => { contextMenuFiredRef.current = false; }, 50);
+            e.event.preventDefault();
+            const be = e.event.browserEvent;
+            window.dispatchEvent(new CustomEvent('koda.context-menu', {
+                detail: { x: be.clientX, y: be.clientY, items: buildEditorMenuItems(editorInstance) }
+            }));
+        });
+    };
+
+    const handleEditorPanelContextMenu = (e) => {
+        e.preventDefault();
+        if (contextMenuFiredRef.current) return;
+        if (!editorRef.current) return;
+        window.dispatchEvent(new CustomEvent('koda.context-menu', {
+            detail: { x: e.clientX, y: e.clientY, items: buildEditorMenuItems(editorRef.current) }
+        }));
     };
 
     return (
-        <div className="editor-panel">
+        <div className="editor-panel" onContextMenu={handleEditorPanelContextMenu}>
             <div className="editor-breadcrumbs" aria-label="Breadcrumbs">
                 {breadcrumbs.map((crumb, index) => (
                     <span className="editor-breadcrumb" key={`${crumb.label}-${index}`}>
