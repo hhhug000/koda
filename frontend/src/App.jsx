@@ -1,4 +1,5 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
+import { createRoot } from 'react-dom/client';
 import { Layout } from './components/Layout';
 import MenuBar from './components/MenuBar'
 import './styles/main.scss';
@@ -7,6 +8,55 @@ import useCommunicator from './components/Communicator';
 import useTheme from './hooks/useTheme';
 import Explorer from './components/Explorer';
 import TerminalPanel from './components/TerminalPanel';
+
+// ── Layout config builder ─────────────────────────────────────────────────────
+
+const GL_BASE = {
+  settings: { hasHeaders: false, popoutWholeStack: true, showPopoutIcon: false, showMaximiseIcon: false },
+  dimensions: { borderWidth: 4 },
+};
+
+function buildConfig({ left, terminal, right }) {
+  const editorItem = { type: 'component', componentName: 'midEditor', componentState: { files: [] } };
+
+  const center = terminal
+    ? {
+        type: 'column',
+        content: [
+          { ...editorItem, height: 65 },
+          { type: 'component', componentName: 'midTopB', height: 35 },
+        ],
+      }
+    : editorItem;
+
+  if (!left && !right) {
+    return { ...GL_BASE, content: [center] };
+  }
+
+  const sideW = 20;
+  const centerW = 100 - ((left ? 1 : 0) + (right ? 1 : 0)) * sideW;
+  const rowContent = [];
+  if (left) rowContent.push({ type: 'component', componentName: 'left', width: sideW });
+  rowContent.push({ ...center, width: centerW });
+  if (right) rowContent.push({ type: 'component', componentName: 'right', width: sideW });
+
+  return { ...GL_BASE, content: [{ type: 'row', content: rowContent }] };
+}
+
+// ── Layout presets (panels only — config derived via buildConfig) ──────────────
+
+export const PRESETS = {
+  default:  { label: 'Default',  panels: { left: true,  terminal: true,  right: true  } },
+  focus:    { label: 'Focus',    panels: { left: false, terminal: false, right: false } },
+  explorer: { label: 'Explorer', panels: { left: true,  terminal: false, right: false } },
+  terminal: { label: 'Terminal', panels: { left: false, terminal: true,  right: false } },
+  compact:  { label: 'Compact',  panels: { left: true,  terminal: true,  right: false } },
+  wide:     { label: 'Wide',     panels: { left: true,  terminal: false, right: true  } },
+};
+
+export const PRESET_DEFS = Object.entries(PRESETS).map(([id, p]) => ({ id, label: p.label, panels: p.panels }));
+
+// ── Panel components ──────────────────────────────────────────────────────────
 
 function GlobalContextMenu() {
   const [menu, setMenu] = useState(null);
@@ -81,44 +131,49 @@ function GlobalContextMenu() {
   );
 }
 
-const LeftPanel = () => (
-  <div className="pane-content" style={{ padding: 0 }}>
-    <Explorer />
-  </div>
-);
+const LeftPanel   = () => <div className="pane-content" style={{ padding: 0 }}><Explorer /></div>;
 const MiddleEditor = ({ files }) => <Tabs files={files ?? []} />;
-const MiddleTopB = () => <TerminalPanel />;
-const RightPanel = () => <div className="pane-content">Right Panel</div>;
-
-const layoutConfig = {
-  settings: { hasHeaders: false, popoutWholeStack: true, showPopoutIcon: false, showMaximiseIcon: false },
-  dimensions: { borderWidth: 4 },
-  content: [{
-    type: 'row',
-    content: [
-      { type: 'component', componentName: 'left', width: 20 },
-      {
-        type: 'column',
-        width: 60,
-        content: [
-          { type: 'component', componentName: 'midEditor', componentState: { files: [] }, height: 50 },
-          { type: 'component', componentName: 'midTopB', height: 50 }
-        ]
-      },
-      { type: 'component', componentName: 'right', width: 20 }
-    ]
-  }]
-};
+const MiddleTopB  = () => <TerminalPanel />;
+const RightPanel  = () => <div className="pane-content">Right Panel</div>;
 
 const components = {
   left: LeftPanel,
   midEditor: MiddleEditor,
   midTopB: MiddleTopB,
-  right: RightPanel
+  right: RightPanel,
 };
+
+// ── Stable element factory ────────────────────────────────────────────────────
+
+function createStablePanels() {
+  const make = (jsx) => {
+    const div = document.createElement('div');
+    div.style.cssText = 'width:100%;height:100%';
+    createRoot(div).render(jsx);
+    return div;
+  };
+  return {
+    left:      make(<LeftPanel />),
+    midEditor: make(<MiddleEditor files={[]} />),
+    midTopB:   make(<MiddleTopB />),
+    right:     make(<RightPanel />),
+  };
+}
+
+// ── App ───────────────────────────────────────────────────────────────────────
 
 function App() {
   const { loading } = useTheme();
+
+  const [activePanels, setActivePanels] = useState(PRESETS.default.panels);
+
+  const layoutConfig = useMemo(() => buildConfig(activePanels), [activePanels]);
+
+  const stableRef = useRef(null);
+  if (stableRef.current === null) {
+    stableRef.current = createStablePanels();
+  }
+
   const handleMessage = (message) => {
     if (message?.type === 'fs-changed') {
       window.dispatchEvent(new CustomEvent('koda.fs-changed'));
@@ -130,8 +185,17 @@ function App() {
 
   return (
     <div className="app-container">
-      <MenuBar />
-      <Layout config={layoutConfig} components={components} />
+      <MenuBar
+        presetDefs={PRESET_DEFS}
+        activePanels={activePanels}
+        onPanelToggle={(key) => setActivePanels(prev => ({ ...prev, [key]: !prev[key] }))}
+        onPresetSelect={(id) => setActivePanels({ ...PRESETS[id].panels })}
+      />
+      <Layout
+        config={layoutConfig}
+        components={components}
+        stableElements={stableRef.current}
+      />
       <GlobalContextMenu />
     </div>
   );

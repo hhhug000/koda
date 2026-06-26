@@ -1,10 +1,213 @@
 .menubar {
-    background: var(--bg-menubar);
-    width: 100%;
-    height: 45px;
-    border-color: var(--border-default);
-    border-style: solid;
-    border-width: 0px 0px 2px 0px;
+  background: var(--bg-menubar);
+  width: 100%;
+  height: 45px;
+  border-color: var(--border-default);
+  border-style: solid;
+  border-width: 0px 0px 2px 0px;
+  flex-shrink: 0;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding: 0 var(--space-sm);
+}
+
+.menubar-right {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+// ── Layout picker ─────────────────────────────────────────────────────────────
+
+.layout-picker-wrapper {
+  position: relative;
+}
+
+.menubar-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  background: none;
+  border: none;
+  border-radius: 4px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: color 0.1s, background 0.1s;
+
+  &:hover {
+    color: var(--text-primary);
+    background: rgba(255, 255, 255, 0.06);
+  }
+
+  &--active {
+    color: var(--text-primary);
+    background: rgba(255, 255, 255, 0.08);
+  }
+}
+
+.layout-dropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: -4px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  border-radius: 8px;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.45);
+  padding: 12px;
+  z-index: 2000;
+  width: 224px;
+
+  // Arrow pointing up toward the button
+  &::before {
+    content: '';
+    position: absolute;
+    top: -5px;
+    right: 11px;
+    width: 8px;
+    height: 8px;
+    background: var(--bg-surface);
+    border-left: 1px solid var(--border-default);
+    border-top: 1px solid var(--border-default);
+    transform: rotate(45deg);
+  }
+}
+
+// ── Custom panel section ──────────────────────────────────────────────────────
+
+.layout-custom {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.layout-toggles {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  flex: 1;
+}
+
+.layout-toggle {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  cursor: pointer;
+  font-size: 12px;
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  color: var(--text-secondary);
+  user-select: none;
+  line-height: 1;
+
+  &:hover {
+    color: var(--text-primary);
+  }
+
+  input[type='checkbox'] {
+    width: 13px;
+    height: 13px;
+    cursor: pointer;
+    accent-color: var(--accent);
     flex-shrink: 0;
-    box-sizing: border-box;
+    margin: 0;
+  }
+}
+
+.layout-section-divider {
+  height: 1px;
+  background: var(--border-default);
+  margin: 12px 0;
+}
+
+// ── Preset grid ───────────────────────────────────────────────────────────────
+
+.layout-dropdown-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 5px;
+}
+
+.layout-preset-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  padding: 7px 4px;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  cursor: pointer;
+  color: var(--text-secondary);
+  transition: background 0.1s, border-color 0.1s, color 0.1s;
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.04);
+    color: var(--text-primary);
+  }
+
+  &--active {
+    border-color: var(--accent);
+    background: rgba(37, 99, 235, 0.1);
+    color: var(--text-primary);
+
+    .layout-thumb {
+      border-color: var(--accent);
+    }
+  }
+}
+
+.layout-preset-label {
+  font-size: 10px;
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  text-align: center;
+  line-height: 1.2;
+  color: inherit;
+}
+
+// ── Thumbnail diagram ─────────────────────────────────────────────────────────
+
+.layout-thumb {
+  display: flex;
+  width: 48px;
+  height: 32px;
+  border: 1px solid var(--border-default);
+  border-radius: 2px;
+  overflow: hidden;
+  gap: 1px;
+  background: var(--border-default); // shows through as dividers
+  flex-shrink: 0;
+
+  &--large {
+    width: 100px;
+    height: 66px;
+    border-radius: 3px;
+
+    .lt-side { width: 18px; }
+  }
+
+  .lt-side {
+    width: 10px;
+    flex-shrink: 0;
+    background: rgba(255, 255, 255, 0.07);
+  }
+
+  .lt-main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+  }
+
+  .lt-editor {
+    flex: 3;
+    background: var(--bg-editor);
+  }
+
+  .lt-terminal {
+    flex: 2;
+    background: rgba(255, 255, 255, 0.03);
+  }
 }
