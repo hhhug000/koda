@@ -520,9 +520,14 @@ async def get_fs_file(path: str):
         if not p.exists() or not p.is_file():
             return {"error": "file not found"}, 404
 
-        # Read file as text
-        with open(p, 'r', encoding='utf-8') as f:
-            content = f.read()
+        # Read file as bytes and auto-detect encoding
+        with open(p, 'rb') as f:
+            raw = f.read()
+
+        from charset_normalizer import from_bytes
+        result = from_bytes(raw).best()
+        encoding = str(result.encoding) if result else 'utf-8'
+        content = raw.decode(encoding, errors='replace')
 
         return PlainTextResponse(content, media_type='text/plain; charset=utf-8')
     except Exception as e:
