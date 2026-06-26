@@ -6,6 +6,7 @@ import Tabs from './components/Tabs';
 import useCommunicator from './components/Communicator';
 import useTheme from './hooks/useTheme';
 import Explorer from './components/Explorer';
+import TerminalPanel from './components/TerminalPanel';
 
 function GlobalContextMenu() {
   const [menu, setMenu] = useState(null);
@@ -86,7 +87,7 @@ const LeftPanel = () => (
   </div>
 );
 const MiddleEditor = ({ files }) => <Tabs files={files ?? []} />;
-const MiddleTopB = () => <div className="pane-content">Middle Top — Tab B</div>;
+const MiddleTopB = () => <TerminalPanel />;
 const RightPanel = () => <div className="pane-content">Right Panel</div>;
 
 const layoutConfig = {

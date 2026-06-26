@@ -337,6 +337,74 @@ async def websocket_endpoint(websocket: WebSocket):
         manager.disconnect(websocket)
 
 
+@app.websocket("/ws/terminal/{terminal_id}")
+async def terminal_websocket(websocket: WebSocket, terminal_id: str):
+    """PTY terminal WebSocket — bridges xterm.js to a real shell process."""
+    await websocket.accept()
+    loop = asyncio.get_event_loop()
+
+    try:
+        from winpty import PtyProcess
+        proc = PtyProcess.spawn(
+            ['powershell.exe', '-NoLogo'],
+            dimensions=(24, 80),
+        )
+    except Exception as e:
+        await websocket.send_text(json.dumps({"type": "output", "data": f"[Failed to start shell: {e}]\r\n"}))
+        await websocket.close()
+        return
+
+    output_queue: asyncio.Queue = asyncio.Queue()
+
+    def pty_reader():
+        while proc.isalive():
+            try:
+                data = proc.read(4096)
+                if data:
+                    loop.call_soon_threadsafe(output_queue.put_nowait, data)
+            except EOFError:
+                break
+            except Exception:
+                break
+        loop.call_soon_threadsafe(output_queue.put_nowait, None)
+
+    reader_thread = threading.Thread(target=pty_reader, daemon=True)
+    reader_thread.start()
+
+    async def send_output():
+        while True:
+            data = await output_queue.get()
+            if data is None:
+                break
+            try:
+                await websocket.send_text(json.dumps({"type": "output", "data": data}))
+            except Exception:
+                break
+
+    send_task = asyncio.create_task(send_output())
+
+    try:
+        while True:
+            raw = await websocket.receive_text()
+            try:
+                msg = json.loads(raw)
+                if msg.get("type") == "input":
+                    proc.write(msg["data"])
+                elif msg.get("type") == "resize":
+                    proc.setwinsize(msg.get("rows", 24), msg.get("cols", 80))
+            except json.JSONDecodeError:
+                pass
+    except Exception:
+        pass
+    finally:
+        send_task.cancel()
+        await output_queue.put(None)
+        try:
+            proc.terminate(force=True)
+        except Exception:
+            pass
+
+
 @app.get("/api/fs/tree")
 async def get_fs_tree(path: str = None, max_depth: int = 5):
     """Return a JSON representation of the file tree rooted at `path`.
