@@ -119,7 +119,11 @@ const components = {
 
 function App() {
   const { loading } = useTheme();
-  const handleMessage = (message) => { console.log('App received message:', message); };
+  const handleMessage = (message) => {
+    if (message?.type === 'fs-changed') {
+      window.dispatchEvent(new CustomEvent('koda.fs-changed'));
+    }
+  };
   useCommunicator(handleMessage);
 
   if (loading) return <div>Loading theme...</div>;

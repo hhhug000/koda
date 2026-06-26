@@ -183,6 +183,11 @@ export default function Explorer({ apiPath = '/api/fs/tree' }) {
     };
   }, []);
 
+  useEffect(() => {
+    window.addEventListener('koda.fs-changed', refreshTree);
+    return () => window.removeEventListener('koda.fs-changed', refreshTree);
+  }, [refreshTree]);
+
   const startRename = useCallback((node) => setRenamingPath(node.path), []);
 
   const handleRenameCommit = useCallback(async (node, newName) => {

@@ -1,6 +1,7 @@
 import asyncio
 import shutil
 import webview
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, WebSocket, Body, Request
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
@@ -263,7 +264,53 @@ manager = WebSocketManager()
 config_dir_global = None
 
 # Create FastAPI app
-app = FastAPI(title="Koda")
+# ─── File-system watcher ─────────────────────────────────────────────────────
+
+_FS_EXCLUDE = {'.git', 'node_modules', '__pycache__', '.venv', 'venv', '.mypy_cache', '.pytest_cache'}
+_fs_timer: threading.Timer | None = None
+_fs_timer_lock = threading.Lock()
+
+def _schedule_fs_notification():
+    global _fs_timer
+    with _fs_timer_lock:
+        if _fs_timer is not None:
+            _fs_timer.cancel()
+        def _notify():
+            message_queue.append({"type": "fs-changed"})
+        _fs_timer = threading.Timer(0.35, _notify)
+        _fs_timer.daemon = True
+        _fs_timer.start()
+
+try:
+    from watchdog.observers import Observer
+    from watchdog.events import FileSystemEventHandler
+
+    class _FSHandler(FileSystemEventHandler):
+        def on_any_event(self, event):
+            path_parts = set(Path(event.src_path).parts)
+            if path_parts & _FS_EXCLUDE:
+                return
+            _schedule_fs_notification()
+
+    _WATCHDOG_AVAILABLE = True
+except ImportError:
+    _WATCHDOG_AVAILABLE = False
+    logger.warning("watchdog not installed — live file watching disabled")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    obs = None
+    if _WATCHDOG_AVAILABLE:
+        obs = Observer()
+        obs.schedule(_FSHandler(), path=str(Path.cwd()), recursive=True)
+        obs.start()
+        logger.info(f"File watcher started on {Path.cwd()}")
+    yield
+    if obs:
+        obs.stop()
+        obs.join()
+
+app = FastAPI(title="Koda", lifespan=lifespan)
 
 # Add CORS middleware
 app.add_middleware(
