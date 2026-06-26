@@ -78,7 +78,7 @@
 
   &:hover {
     color: var(--text-primary);
-    background: rgba(255, 255, 255, 0.04);
+    background: var(--bg-hover);
   }
 }
 
@@ -95,13 +95,13 @@
   margin: 0 var(--space-xs);
 
   &:hover {
-    background: rgba(255, 255, 255, 0.04);
+    background: var(--bg-hover);
 
     .terminal-entry-action { opacity: 1; }
   }
 
   &.terminal-entry--active {
-    background: rgba(255, 255, 255, 0.08);
+    background: var(--bg-active);
   }
 }
 
@@ -142,7 +142,7 @@
 
   &:hover {
     color: var(--text-primary);
-    background: rgba(255, 255, 255, 0.08);
+    background: var(--bg-active);
   }
 }
 
@@ -159,5 +159,5 @@
   font-family: inherit;
   padding: 1px 5px;
   outline: none;
-  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.25);
+  box-shadow: var(--accent-shadow);
 }

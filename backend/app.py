@@ -88,7 +88,31 @@ def ensure_config():
   --accent-soft: #dbe7ff;
   --shadow: 0 10px 30px rgba(18, 24, 38, 0.08);
   --panel-radius: 0px;
-  
+
+  /* Interactive overlays */
+  --bg-hover: rgba(255, 255, 255, 0.04);
+  --bg-hover-strong: rgba(255, 255, 255, 0.06);
+  --bg-active: rgba(255, 255, 255, 0.08);
+  --bg-active-hover: rgba(255, 255, 255, 0.10);
+
+  /* Thumbnail widget */
+  --bg-thumbnail-side: rgba(255, 255, 255, 0.07);
+  --bg-thumbnail-terminal: rgba(255, 255, 255, 0.03);
+
+  /* Accent-derived */
+  --bg-accent-subtle: rgba(37, 99, 235, 0.10);
+  --accent-shadow: 0 0 0 2px rgba(37, 99, 235, 0.25);
+
+  /* Danger */
+  --color-danger: #ef4444;
+  --bg-danger: rgba(239, 68, 68, 0.15);
+  --bg-danger-hover: rgba(239, 68, 68, 0.25);
+  --border-danger: rgba(239, 68, 68, 0.30);
+
+  /* Shadows */
+  --shadow-popup: 0 8px 28px rgba(0, 0, 0, 0.45);
+  --shadow-menu: 0 8px 24px rgba(0, 0, 0, 0.40);
+
   /* Spacing */
   --space-xs: 4px;
   --space-sm: 8px;
@@ -140,6 +164,8 @@ html[data-theme='midnight'] {
   --accent: #7dd3fc;
   --accent-soft: rgba(125, 211, 252, 0.12);
   --shadow: 0 16px 40px rgba(0, 0, 0, 0.35);
+  --bg-accent-subtle: rgba(125, 211, 252, 0.10);
+  --accent-shadow: 0 0 0 2px rgba(125, 211, 252, 0.25);
   
   /* Syntax Highlighting for Midnight Theme */
   --syntax-keyword: #60a5fa;

@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef, useCallback } from 'react';
+import { useEffect, useLayoutEffect, useState, useRef, useCallback } from 'react';
 import { Icon } from './Icon';
 import '../styles/explorer.scss';
 
@@ -26,6 +26,79 @@ function getParentPath(filePath) {
 
 function dispatchContextMenu(x, y, items) {
   window.dispatchEvent(new CustomEvent('koda.context-menu', { detail: { x, y, items } }));
+}
+
+function ExplorerPopup({ message, pos, type, onClose, onConfirm }) {
+  const popupRef = useRef(null);
+  const [computed, setComputed] = useState(null);
+
+  useLayoutEffect(() => {
+    const el = popupRef.current;
+    if (!el) return;
+    const W = el.offsetWidth;
+    const H = el.offsetHeight;
+    const vW = window.innerWidth;
+    const vH = window.innerHeight;
+    const GAP = 12;
+    const MARGIN = 8;
+
+    // Horizontal: centre on cursor, clamp so popup never clips viewport edge
+    const idealLeft = pos.x - W / 2;
+    const left = Math.max(MARGIN, Math.min(idealLeft, vW - W - MARGIN));
+
+    // Vertical: prefer below cursor; flip above if it would clip the bottom
+    const fitsBelow = pos.y + GAP + H + MARGIN <= vH;
+    const top = fitsBelow
+      ? pos.y + GAP
+      : Math.max(MARGIN, pos.y - GAP - H);
+
+    // Arrow points back to the cursor regardless of how the popup shifted
+    const arrowLeft = Math.max(12, Math.min(pos.x - left, W - 12));
+
+    setComputed({ top, left, arrowLeft, above: !fitsBelow });
+  }, [pos]);
+
+  useEffect(() => {
+    const onMouseDown = (e) => {
+      if (popupRef.current && !popupRef.current.contains(e.target)) onClose();
+    };
+    const onKey = (e) => { if (e.key === 'Escape') onClose(); };
+    document.addEventListener('mousedown', onMouseDown);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onMouseDown);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [onClose]);
+
+  const posStyle = computed
+    ? { top: computed.top, left: computed.left }
+    : { visibility: 'hidden', top: -9999, left: -9999 };
+
+  return (
+    <div
+      ref={popupRef}
+      className={`explorer-popup${computed?.above ? ' explorer-popup--above' : ''}`}
+      style={posStyle}
+    >
+      {computed && <span className="explorer-popup-arrow" style={{ left: computed.arrowLeft }} />}
+      <p className="explorer-popup-msg">{message}</p>
+      <div className="explorer-popup-actions">
+        {type === 'confirm' && (
+          <button className="explorer-popup-btn explorer-popup-btn--cancel" onClick={onClose}>
+            Cancel
+          </button>
+        )}
+        <button
+          className={`explorer-popup-btn ${type === 'confirm' ? 'explorer-popup-btn--danger' : 'explorer-popup-btn--ok'}`}
+          onClick={type === 'confirm' ? onConfirm : onClose}
+          autoFocus
+        >
+          {type === 'confirm' ? 'Delete' : 'OK'}
+        </button>
+      </div>
+    </div>
+  );
 }
 
 function FileRow({ node, depth = 0, onToggle, defaultOpen = false, onContextMenu, renamingPath, onRenameCommit, activePath }) {
@@ -134,6 +207,28 @@ export default function Explorer({ apiPath = '/api/fs/tree' }) {
   const [clipboard, setClipboard] = useState(null);
   const [renamingPath, setRenamingPath] = useState(null);
   const [activePath, setActivePath] = useState(null);
+  const [alertPopup, setAlertPopup] = useState(null);
+  const [confirmPopup, setConfirmPopup] = useState(null);
+  const lastMenuPosRef = useRef({ x: 200, y: 200 });
+
+  const showAlert = useCallback((message) => {
+    setAlertPopup({ message, pos: { ...lastMenuPosRef.current } });
+  }, []);
+
+  const showConfirm = useCallback((message) => {
+    return new Promise(resolve => {
+      setConfirmPopup({ message, pos: { ...lastMenuPosRef.current }, resolve });
+    });
+  }, []);
+
+  const closeAlert = useCallback(() => setAlertPopup(null), []);
+
+  const closeConfirm = useCallback((result) => {
+    setConfirmPopup(prev => {
+      prev?.resolve(result);
+      return null;
+    });
+  }, []);
 
   const refreshTree = useCallback(async () => {
     try {
@@ -202,15 +297,16 @@ export default function Explorer({ apiPath = '/api/fs/tree' }) {
       refreshTree();
     } else {
       const body = await res.json().catch(() => ({}));
-      window.alert(`Rename failed: ${body.error || res.statusText}`);
+      showAlert(`Rename failed: ${body.error || res.statusText}`);
     }
-  }, [refreshTree]);
+  }, [refreshTree, showAlert]);
 
   const doDelete = useCallback(async (node) => {
     const msg = node.type === 'dir'
       ? `Delete folder "${node.name}" and all its contents?`
       : `Delete "${node.name}"?`;
-    if (!window.confirm(msg)) return;
+    const confirmed = await showConfirm(msg);
+    if (!confirmed) return;
     const res = await fetch(
       resolveApiUrl(`/api/fs/item?path=${encodeURIComponent(node.path)}`),
       { method: 'DELETE' }
@@ -219,9 +315,9 @@ export default function Explorer({ apiPath = '/api/fs/tree' }) {
       refreshTree();
     } else {
       const body = await res.json().catch(() => ({}));
-      window.alert(`Delete failed: ${body.error || res.statusText}`);
+      showAlert(`Delete failed: ${body.error || res.statusText}`);
     }
-  }, [refreshTree]);
+  }, [refreshTree, showAlert, showConfirm]);
 
   const doCopy = useCallback((node) => setClipboard({ node }), []);
 
@@ -245,9 +341,9 @@ export default function Explorer({ apiPath = '/api/fs/tree' }) {
       refreshTree();
     } else {
       const body = await res.json().catch(() => ({}));
-      window.alert(`Paste failed: ${body.error || res.statusText}`);
+      showAlert(`Paste failed: ${body.error || res.statusText}`);
     }
-  }, [clipboard, tree, refreshTree]);
+  }, [clipboard, tree, refreshTree, showAlert]);
 
   const doDuplicate = useCallback(async (node) => {
     const res = await fetch(resolveApiUrl('/api/fs/duplicate'), {
@@ -259,9 +355,9 @@ export default function Explorer({ apiPath = '/api/fs/tree' }) {
       refreshTree();
     } else {
       const body = await res.json().catch(() => ({}));
-      window.alert(`Duplicate failed: ${body.error || res.statusText}`);
+      showAlert(`Duplicate failed: ${body.error || res.statusText}`);
     }
-  }, [refreshTree]);
+  }, [refreshTree, showAlert]);
 
   const doCopyPath = useCallback((node) => {
     navigator.clipboard.writeText(node.path).catch(() => {});
@@ -308,11 +404,13 @@ export default function Explorer({ apiPath = '/api/fs/tree' }) {
 
   const handleContextMenu = useCallback((e, node) => {
     e.preventDefault();
+    lastMenuPosRef.current = { x: e.clientX, y: e.clientY };
     dispatchContextMenu(e.clientX, e.clientY, getMenuItems(node));
   }, [getMenuItems]);
 
   const handleExplorerContextMenu = useCallback((e) => {
     e.preventDefault();
+    lastMenuPosRef.current = { x: e.clientX, y: e.clientY };
     dispatchContextMenu(e.clientX, e.clientY, getMenuItems(null));
   }, [getMenuItems]);
 
@@ -333,6 +431,25 @@ export default function Explorer({ apiPath = '/api/fs/tree' }) {
         />
       ) : (
         <div>No files</div>
+      )}
+
+      {alertPopup && (
+        <ExplorerPopup
+          type="alert"
+          message={alertPopup.message}
+          pos={alertPopup.pos}
+          onClose={closeAlert}
+        />
+      )}
+
+      {confirmPopup && (
+        <ExplorerPopup
+          type="confirm"
+          message={confirmPopup.message}
+          pos={confirmPopup.pos}
+          onClose={() => closeConfirm(false)}
+          onConfirm={() => closeConfirm(true)}
+        />
       )}
     </div>
   );

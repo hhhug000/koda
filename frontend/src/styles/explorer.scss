@@ -23,15 +23,15 @@
 }
 
 .explorer-entry:hover {
-  background: rgba(255,255,255,0.04);
+  background: var(--bg-hover);
 }
 
 .explorer-entry--active {
-  background: rgba(255,255,255,0.08);
+  background: var(--bg-active);
 }
 
 .explorer-entry--active:hover {
-  background: rgba(255,255,255,0.1);
+  background: var(--bg-active-hover);
 }
 
 .explorer-chevron {
@@ -72,7 +72,7 @@
   font-family: inherit;
   padding: 1px 5px;
   outline: none;
-  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.25);
+  box-shadow: var(--accent-shadow);
 }
 
 .context-menu {
@@ -83,7 +83,7 @@
   border: 1px solid var(--border-default);
   border-radius: 6px;
   padding: 4px 0;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  box-shadow: var(--shadow-menu);
   font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial;
   font-size: 13px;
 }
@@ -115,4 +115,84 @@
   height: 1px;
   background: var(--border-default);
   margin: 4px 0;
+}
+
+// ── Inline popup (alert / confirm) ───────────────────────────────────────────
+
+.explorer-popup {
+  position: fixed;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  border-radius: 8px;
+  box-shadow: var(--shadow-popup);
+  padding: 12px 14px;
+  z-index: 3000;
+  min-width: 200px;
+  max-width: 280px;
+}
+
+.explorer-popup-arrow {
+  position: absolute;
+  top: -5px;
+  width: 8px;
+  height: 8px;
+  background: var(--bg-surface);
+  border-left: 1px solid var(--border-default);
+  border-top: 1px solid var(--border-default);
+  transform: translateX(-50%) rotate(45deg);
+
+  // Flip when popup is rendered above the cursor
+  .explorer-popup--above & {
+    top: auto;
+    bottom: -5px;
+    border-left: none;
+    border-top: none;
+    border-right: 1px solid var(--border-default);
+    border-bottom: 1px solid var(--border-default);
+  }
+}
+
+.explorer-popup-msg {
+  margin: 0 0 10px 0;
+  font-size: 12px;
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial;
+  color: var(--text-primary);
+  line-height: 1.4;
+}
+
+.explorer-popup-actions {
+  display: flex;
+  gap: 6px;
+  justify-content: flex-end;
+}
+
+.explorer-popup-btn {
+  padding: 4px 10px;
+  font-size: 11px;
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial;
+  border-radius: 4px;
+  border: 1px solid var(--border-default);
+  cursor: pointer;
+  transition: background 0.1s, color 0.1s;
+
+  &--cancel,
+  &--ok {
+    background: none;
+    color: var(--text-secondary);
+
+    &:hover {
+      background: rgba(255, 255, 255, 0.06);
+      color: var(--text-primary);
+    }
+  }
+
+  &--danger {
+    background: var(--bg-danger);
+    color: var(--color-danger);
+    border-color: var(--border-danger);
+
+    &:hover {
+      background: var(--bg-danger-hover);
+    }
+  }
 }
