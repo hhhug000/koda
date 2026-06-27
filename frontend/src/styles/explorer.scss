@@ -34,6 +34,16 @@
   background: var(--bg-active-hover);
 }
 
+.explorer-entry--dragging {
+  opacity: 0.35;
+}
+
+.explorer-entry--drag-over {
+  background: var(--bg-accent-subtle) !important;
+  outline: 1px solid var(--accent);
+  outline-offset: -1px;
+}
+
 .explorer-chevron {
   width: 14px;
   flex-shrink: 0;

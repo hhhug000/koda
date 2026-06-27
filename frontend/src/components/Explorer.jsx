@@ -42,19 +42,15 @@ function ExplorerPopup({ message, pos, type, onClose, onConfirm }) {
     const GAP = 12;
     const MARGIN = 8;
 
-    // Horizontal: centre on cursor, clamp so popup never clips viewport edge
     const idealLeft = pos.x - W / 2;
     const left = Math.max(MARGIN, Math.min(idealLeft, vW - W - MARGIN));
 
-    // Vertical: prefer below cursor; flip above if it would clip the bottom
     const fitsBelow = pos.y + GAP + H + MARGIN <= vH;
     const top = fitsBelow
       ? pos.y + GAP
       : Math.max(MARGIN, pos.y - GAP - H);
 
-    // Arrow points back to the cursor regardless of how the popup shifted
     const arrowLeft = Math.max(12, Math.min(pos.x - left, W - 12));
-
     setComputed({ top, left, arrowLeft, above: !fitsBelow });
   }, [pos]);
 
@@ -101,12 +97,19 @@ function ExplorerPopup({ message, pos, type, onClose, onConfirm }) {
   );
 }
 
-function FileRow({ node, depth = 0, onToggle, defaultOpen = false, onContextMenu, renamingPath, onRenameCommit, activePath }) {
+function FileRow({
+  node, depth = 0, onToggle, defaultOpen = false,
+  onContextMenu, renamingPath, onRenameCommit, activePath,
+  draggingPath, dragOverPath, onDragStart, onDragOver, onDrop, onDragEnd,
+}) {
   const isDir = node.type === 'dir';
   const [open, setOpen] = useState(defaultOpen);
   const isRenaming = renamingPath === node.path;
   const [renameValue, setRenameValue] = useState(node.name);
   const inputRef = useRef(null);
+
+  const isDragging = draggingPath === node.path;
+  const isDragOver = dragOverPath === node.path;
 
   useEffect(() => {
     if (isRenaming) setRenameValue(node.name);
@@ -150,12 +153,47 @@ function FileRow({ node, depth = 0, onToggle, defaultOpen = false, onContextMenu
     onContextMenu(e, node);
   };
 
+  const handleDragStart = (e) => {
+    e.stopPropagation();
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', node.path);
+    onDragStart(node);
+  };
+
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    e.dataTransfer.dropEffect = 'move';
+    onDragOver(node);
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    onDrop(node);
+  };
+
+  const handleDragEnd = () => onDragEnd();
+
+  const cls = [
+    'explorer-entry',
+    isDir ? 'explorer-dir' : 'explorer-file',
+    activePath === node.path ? 'explorer-entry--active' : '',
+    isDragging ? 'explorer-entry--dragging' : '',
+    isDragOver ? 'explorer-entry--drag-over' : '',
+  ].filter(Boolean).join(' ');
+
   return (
     <div className="explorer-row" style={{ paddingLeft: `${depth * 5}px` }}>
       <div
-        className={`explorer-entry ${isDir ? 'explorer-dir' : 'explorer-file'}${activePath === node.path ? ' explorer-entry--active' : ''}`}
+        className={cls}
+        draggable={!isRenaming}
         onClick={toggle}
         onContextMenu={handleContextMenu}
+        onDragStart={handleDragStart}
+        onDragOver={handleDragOver}
+        onDrop={handleDrop}
+        onDragEnd={handleDragEnd}
         role={isDir ? 'button' : 'listitem'}
         tabIndex={0}
       >
@@ -191,6 +229,12 @@ function FileRow({ node, depth = 0, onToggle, defaultOpen = false, onContextMenu
               renamingPath={renamingPath}
               onRenameCommit={onRenameCommit}
               activePath={activePath}
+              draggingPath={draggingPath}
+              dragOverPath={dragOverPath}
+              onDragStart={onDragStart}
+              onDragOver={onDragOver}
+              onDrop={onDrop}
+              onDragEnd={onDragEnd}
             />
           ))}
         </div>
@@ -209,6 +253,9 @@ export default function Explorer({ apiPath = '/api/fs/tree' }) {
   const [activePath, setActivePath] = useState(null);
   const [alertPopup, setAlertPopup] = useState(null);
   const [confirmPopup, setConfirmPopup] = useState(null);
+  const [draggingPath, setDraggingPath] = useState(null);
+  const [dragOverPath, setDragOverPath] = useState(null);
+  const draggingNodeRef = useRef(null);
   const lastMenuPosRef = useRef({ x: 200, y: 200 });
 
   const showAlert = useCallback((message) => {
@@ -228,6 +275,12 @@ export default function Explorer({ apiPath = '/api/fs/tree' }) {
       prev?.resolve(result);
       return null;
     });
+  }, []);
+
+  const clearDragState = useCallback(() => {
+    setDraggingPath(null);
+    setDragOverPath(null);
+    draggingNodeRef.current = null;
   }, []);
 
   const refreshTree = useCallback(async () => {
@@ -371,6 +424,63 @@ export default function Explorer({ apiPath = '/api/fs/tree' }) {
     navigator.clipboard.writeText(rel).catch(() => {});
   }, [tree]);
 
+  // ── Drag-and-drop ─────────────────────────────────────────────────────────────
+
+  const handleDragStart = useCallback((node) => {
+    draggingNodeRef.current = node;
+    setDraggingPath(node.path);
+  }, []);
+
+  const handleDragOver = useCallback((node) => {
+    setDragOverPath(node.path);
+  }, []);
+
+  const handleDrop = useCallback(async (targetNode) => {
+    const srcNode = draggingNodeRef.current;
+    clearDragState();
+    if (!srcNode || !targetNode) return;
+    if (srcNode.path === targetNode.path) return;
+
+    const destDir = targetNode.type === 'dir'
+      ? targetNode.path
+      : getParentPath(targetNode.path);
+
+    // Already in this directory
+    if (getParentPath(srcNode.path) === destDir) return;
+
+    // Can't move a directory into itself or a descendant
+    if (
+      srcNode.type === 'dir' && (
+        destDir === srcNode.path ||
+        destDir.startsWith(srcNode.path + '/') ||
+        destDir.startsWith(srcNode.path + '\\')
+      )
+    ) return;
+
+    const res = await fetch(resolveApiUrl('/api/fs/move'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ src: srcNode.path, dest_dir: destDir }),
+    });
+    if (res.ok) {
+      refreshTree();
+    } else {
+      const body = await res.json().catch(() => ({}));
+      showAlert(`Move failed: ${body.error || res.statusText}`);
+    }
+  }, [clearDragState, refreshTree, showAlert]);
+
+  const handleDragEnd = useCallback(() => clearDragState(), [clearDragState]);
+
+  // Clear drag-over highlight when cursor leaves the explorer entirely
+  const handleExplorerDragLeave = useCallback((e) => {
+    if (!e.currentTarget.contains(e.relatedTarget)) {
+      setDragOverPath(null);
+    }
+  }, []);
+
+  // ── Context menu ─────────────────────────────────────────────────────────────
+
   const getMenuItems = useCallback((node) => {
     if (!node) {
       return [{ label: 'Paste', action: () => doPaste(null), disabled: !clipboard }];
@@ -418,7 +528,12 @@ export default function Explorer({ apiPath = '/api/fs/tree' }) {
   if (error) return <div className="explorer-root">Error: {error}</div>;
 
   return (
-    <div className="explorer-root" role="tree" onContextMenu={handleExplorerContextMenu}>
+    <div
+      className="explorer-root"
+      role="tree"
+      onContextMenu={handleExplorerContextMenu}
+      onDragLeave={handleExplorerDragLeave}
+    >
       {tree ? (
         <FileRow
           node={tree}
@@ -428,6 +543,12 @@ export default function Explorer({ apiPath = '/api/fs/tree' }) {
           renamingPath={renamingPath}
           onRenameCommit={handleRenameCommit}
           activePath={activePath}
+          draggingPath={draggingPath}
+          dragOverPath={dragOverPath}
+          onDragStart={handleDragStart}
+          onDragOver={handleDragOver}
+          onDrop={handleDrop}
+          onDragEnd={handleDragEnd}
         />
       ) : (
         <div>No files</div>

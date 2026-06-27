@@ -618,6 +618,33 @@ async def rename_fs_item(request: Request):
         return {"error": str(e)}, 500
 
 
+@app.post("/api/fs/move")
+async def move_fs_item(request: Request):
+    """Move a file or directory into dest_dir. Body: { src, dest_dir }."""
+    try:
+        body = await request.json()
+        src = Path(body["src"]).resolve()
+        dest_dir = Path(body["dest_dir"]).resolve()
+        if not src.exists():
+            return {"error": "source does not exist"}, 404
+        if not dest_dir.is_dir():
+            return {"error": "dest_dir is not a directory"}, 400
+        # Prevent moving a directory into itself or one of its descendants
+        try:
+            dest_dir.relative_to(src)
+            return {"error": "cannot move a directory into itself"}, 400
+        except ValueError:
+            pass
+        dest = dest_dir / src.name
+        if dest.exists():
+            return {"error": f"'{src.name}' already exists in the destination"}, 409
+        shutil.move(str(src), str(dest))
+        return {"success": True, "dest": str(dest)}
+    except Exception as e:
+        logger.exception(f"Failed to move: {e}")
+        return {"error": str(e)}, 500
+
+
 @app.post("/api/fs/copy")
 async def copy_fs_item(request: Request):
     """Copy a file or directory into dest_dir. Body: { src, dest_dir }.
