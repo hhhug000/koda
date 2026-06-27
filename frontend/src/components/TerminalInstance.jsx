@@ -22,10 +22,10 @@ export default function TerminalInstance({ terminalId, active }) {
 
     const term = new Terminal({
       theme: {
-        background:    readCssVar('--bg-editor')   || '#162637',
+        background:    readCssVar('--bg-surface')   || '#151E2A',
         foreground:    readCssVar('--text-primary') || '#DBDDDE',
         cursor:        readCssVar('--accent')       || '#2563eb',
-        cursorAccent:  readCssVar('--bg-editor')   || '#162637',
+        cursorAccent:  readCssVar('--bg-surface')   || '#151E2A',
         selectionBackground: '#2563eb44',
         black:         '#1e2530',
         red:           '#f87171',

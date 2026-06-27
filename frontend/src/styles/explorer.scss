@@ -3,7 +3,7 @@
   height: 100%;
   overflow: auto;
   padding: var(--space-sm);
-  background: var(--bg-editor);
+  background: var(--bg-surface);
   color: var(--text-primary);
   font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial;
   font-size: 13px;
@@ -64,7 +64,7 @@
 .explorer-rename-input {
   flex: 1;
   min-width: 0;
-  background: var(--bg-editor);
+  background: var(--bg-surface);
   border: 1px solid var(--accent);
   border-radius: 3px;
   color: var(--text-primary);
