@@ -28,6 +28,8 @@ function dispatchContextMenu(x, y, items) {
   window.dispatchEvent(new CustomEvent('koda.context-menu', { detail: { x, y, items } }));
 }
 
+// ── Tooltip popup (alert / confirm) ──────────────────────────────────────────
+
 function ExplorerPopup({ message, pos, type, onClose, onConfirm }) {
   const popupRef = useRef(null);
   const [computed, setComputed] = useState(null);
@@ -44,12 +46,8 @@ function ExplorerPopup({ message, pos, type, onClose, onConfirm }) {
 
     const idealLeft = pos.x - W / 2;
     const left = Math.max(MARGIN, Math.min(idealLeft, vW - W - MARGIN));
-
     const fitsBelow = pos.y + GAP + H + MARGIN <= vH;
-    const top = fitsBelow
-      ? pos.y + GAP
-      : Math.max(MARGIN, pos.y - GAP - H);
-
+    const top = fitsBelow ? pos.y + GAP : Math.max(MARGIN, pos.y - GAP - H);
     const arrowLeft = Math.max(12, Math.min(pos.x - left, W - 12));
     setComputed({ top, left, arrowLeft, above: !fitsBelow });
   }, [pos]);
@@ -97,10 +95,54 @@ function ExplorerPopup({ message, pos, type, onClose, onConfirm }) {
   );
 }
 
+// ── Inline new-item input row ─────────────────────────────────────────────────
+
+function NewItemInput({ type, depth, onCommit, onCancel }) {
+  const [value, setValue] = useState('');
+  const inputRef = useRef(null);
+
+  useEffect(() => { inputRef.current?.focus(); }, []);
+
+  const commit = () => {
+    const name = value.trim();
+    if (name) onCommit(name);
+    else onCancel();
+  };
+
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter') commit();
+    else if (e.key === 'Escape') onCancel();
+  };
+
+  return (
+    <div className="explorer-row" style={{ paddingLeft: `${depth * 5}px` }}>
+      <div className="explorer-entry">
+        <span className="explorer-chevron" />
+        <span className="explorer-icon">
+          <Icon name={type === 'dir' ? 'folder' : 'file'} />
+        </span>
+        <input
+          ref={inputRef}
+          className="explorer-rename-input"
+          value={value}
+          placeholder={type === 'dir' ? 'folder name' : 'file name'}
+          onChange={(e) => setValue(e.target.value)}
+          onKeyDown={handleKeyDown}
+          onBlur={commit}
+          onClick={(e) => e.stopPropagation()}
+        />
+      </div>
+    </div>
+  );
+}
+
+// ── File / folder row ─────────────────────────────────────────────────────────
+
 function FileRow({
   node, depth = 0, onToggle, defaultOpen = false,
   onContextMenu, renamingPath, onRenameCommit, activePath,
   draggingPath, dragOverPath, onDragStart, onDragOver, onDrop, onDragEnd,
+  newItemState, onNewItemCommit, onNewItemCancel,
 }) {
   const isDir = node.type === 'dir';
   const [open, setOpen] = useState(defaultOpen);
@@ -110,6 +152,12 @@ function FileRow({
 
   const isDragging = draggingPath === node.path;
   const isDragOver = dragOverPath === node.path;
+  const isNewItemTarget = isDir && newItemState?.parentPath === node.path;
+
+  // Auto-expand when this directory is the new-item target
+  useEffect(() => {
+    if (isNewItemTarget && !open) setOpen(true);
+  }, [isNewItemTarget]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (isRenaming) setRenameValue(node.name);
@@ -119,11 +167,8 @@ function FileRow({
     if (isRenaming && inputRef.current) {
       inputRef.current.focus();
       const dotIdx = node.name.lastIndexOf('.');
-      if (dotIdx > 0 && !isDir) {
-        inputRef.current.setSelectionRange(0, dotIdx);
-      } else {
-        inputRef.current.select();
-      }
+      if (dotIdx > 0 && !isDir) inputRef.current.setSelectionRange(0, dotIdx);
+      else inputRef.current.select();
     }
   }, [isRenaming, isDir, node.name]);
 
@@ -173,8 +218,6 @@ function FileRow({
     onDrop(node);
   };
 
-  const handleDragEnd = () => onDragEnd();
-
   const cls = [
     'explorer-entry',
     isDir ? 'explorer-dir' : 'explorer-file',
@@ -182,6 +225,12 @@ function FileRow({
     isDragging ? 'explorer-entry--dragging' : '',
     isDragOver ? 'explorer-entry--drag-over' : '',
   ].filter(Boolean).join(' ');
+
+  const sharedChildProps = {
+    onToggle, onContextMenu, renamingPath, onRenameCommit, activePath,
+    draggingPath, dragOverPath, onDragStart, onDragOver, onDrop, onDragEnd,
+    newItemState, onNewItemCommit, onNewItemCancel,
+  };
 
   return (
     <div className="explorer-row" style={{ paddingLeft: `${depth * 5}px` }}>
@@ -193,7 +242,7 @@ function FileRow({
         onDragStart={handleDragStart}
         onDragOver={handleDragOver}
         onDrop={handleDrop}
-        onDragEnd={handleDragEnd}
+        onDragEnd={() => onDragEnd()}
         role={isDir ? 'button' : 'listitem'}
         tabIndex={0}
       >
@@ -217,24 +266,23 @@ function FileRow({
           <span className="explorer-label">{node.name}</span>
         )}
       </div>
-      {isDir && open && node.children && (
+
+      {isDir && open && (
         <div className="explorer-children">
-          {node.children.map((child) => (
+          {isNewItemTarget && (
+            <NewItemInput
+              type={newItemState.type}
+              depth={depth + 1}
+              onCommit={(name) => onNewItemCommit(node.path, newItemState.type, name)}
+              onCancel={onNewItemCancel}
+            />
+          )}
+          {node.children?.map((child) => (
             <FileRow
               key={child.path}
               node={child}
               depth={depth + 1}
-              onToggle={onToggle}
-              onContextMenu={onContextMenu}
-              renamingPath={renamingPath}
-              onRenameCommit={onRenameCommit}
-              activePath={activePath}
-              draggingPath={draggingPath}
-              dragOverPath={dragOverPath}
-              onDragStart={onDragStart}
-              onDragOver={onDragOver}
-              onDrop={onDrop}
-              onDragEnd={onDragEnd}
+              {...sharedChildProps}
             />
           ))}
         </div>
@@ -242,6 +290,8 @@ function FileRow({
     </div>
   );
 }
+
+// ── Explorer root ─────────────────────────────────────────────────────────────
 
 export default function Explorer({ apiPath = '/api/fs/tree' }) {
   const apiUrl = resolveApiUrl(apiPath);
@@ -255,6 +305,7 @@ export default function Explorer({ apiPath = '/api/fs/tree' }) {
   const [confirmPopup, setConfirmPopup] = useState(null);
   const [draggingPath, setDraggingPath] = useState(null);
   const [dragOverPath, setDragOverPath] = useState(null);
+  const [newItemState, setNewItemState] = useState(null); // { parentPath, type }
   const draggingNodeRef = useRef(null);
   const lastMenuPosRef = useRef({ x: 200, y: 200 });
 
@@ -269,28 +320,17 @@ export default function Explorer({ apiPath = '/api/fs/tree' }) {
   }, []);
 
   const closeAlert = useCallback(() => setAlertPopup(null), []);
-
   const closeConfirm = useCallback((result) => {
-    setConfirmPopup(prev => {
-      prev?.resolve(result);
-      return null;
-    });
-  }, []);
-
-  const clearDragState = useCallback(() => {
-    setDraggingPath(null);
-    setDragOverPath(null);
-    draggingNodeRef.current = null;
+    setConfirmPopup(prev => { prev?.resolve(result); return null; });
   }, []);
 
   const refreshTree = useCallback(async () => {
     try {
       const res = await fetch(apiUrl, { cache: 'no-store' });
       if (!res.ok) throw new Error(`Failed: ${res.status}`);
-      const contentType = res.headers.get('content-type') || '';
-      if (!contentType.includes('application/json')) throw new Error('Expected JSON');
-      const data = await res.json();
-      setTree(data);
+      const ct = res.headers.get('content-type') || '';
+      if (!ct.includes('application/json')) throw new Error('Expected JSON');
+      setTree(await res.json());
     } catch (err) {
       setError(err.message || String(err));
     }
@@ -305,10 +345,10 @@ export default function Explorer({ apiPath = '/api/fs/tree' }) {
           const txt = await res.text().catch(() => '');
           throw new Error(`Failed to fetch: ${res.status} ${res.statusText} - ${txt.slice(0, 200)}`);
         }
-        const contentType = res.headers.get('content-type') || '';
-        if (!contentType.includes('application/json')) {
+        const ct = res.headers.get('content-type') || '';
+        if (!ct.includes('application/json')) {
           const text = await res.text().catch(() => '');
-          throw new Error(`Expected JSON but received ${contentType || 'unknown'}: ${text.slice(0, 300)}`);
+          throw new Error(`Expected JSON but received ${ct || 'unknown'}: ${text.slice(0, 300)}`);
         }
         const data = await res.json();
         if (!cancelled) setTree(data);
@@ -336,6 +376,37 @@ export default function Explorer({ apiPath = '/api/fs/tree' }) {
     return () => window.removeEventListener('koda.fs-changed', refreshTree);
   }, [refreshTree]);
 
+  // ── New file / folder ───────────────────────────────────────────────────────
+
+  const startNewItem = useCallback((parentPath, type) => {
+    setNewItemState({ parentPath, type });
+  }, []);
+
+  const handleNewItemCommit = useCallback(async (parentPath, type, name) => {
+    setNewItemState(null);
+    const path = `${parentPath.replace(/[\\/]$/, '')}/${name}`;
+    const res = await fetch(resolveApiUrl('/api/fs/create'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ path, type }),
+    });
+    if (res.ok) {
+      await refreshTree();
+      if (type === 'file') {
+        window.dispatchEvent(new CustomEvent('koda.open-file', {
+          detail: { filePath: path, fileName: name }
+        }));
+      }
+    } else {
+      const body = await res.json().catch(() => ({}));
+      showAlert(`Could not create ${type === 'dir' ? 'folder' : 'file'}: ${body.error || res.statusText}`);
+    }
+  }, [refreshTree, showAlert]);
+
+  const handleNewItemCancel = useCallback(() => setNewItemState(null), []);
+
+  // ── Rename ──────────────────────────────────────────────────────────────────
+
   const startRename = useCallback((node) => setRenamingPath(node.path), []);
 
   const handleRenameCommit = useCallback(async (node, newName) => {
@@ -346,53 +417,48 @@ export default function Explorer({ apiPath = '/api/fs/tree' }) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ path: node.path, new_name: newName }),
     });
-    if (res.ok) {
-      refreshTree();
-    } else {
+    if (res.ok) refreshTree();
+    else {
       const body = await res.json().catch(() => ({}));
       showAlert(`Rename failed: ${body.error || res.statusText}`);
     }
   }, [refreshTree, showAlert]);
 
+  // ── Delete ──────────────────────────────────────────────────────────────────
+
   const doDelete = useCallback(async (node) => {
     const msg = node.type === 'dir'
       ? `Delete folder "${node.name}" and all its contents?`
       : `Delete "${node.name}"?`;
-    const confirmed = await showConfirm(msg);
-    if (!confirmed) return;
+    if (!await showConfirm(msg)) return;
     const res = await fetch(
       resolveApiUrl(`/api/fs/item?path=${encodeURIComponent(node.path)}`),
       { method: 'DELETE' }
     );
-    if (res.ok) {
-      refreshTree();
-    } else {
+    if (res.ok) refreshTree();
+    else {
       const body = await res.json().catch(() => ({}));
       showAlert(`Delete failed: ${body.error || res.statusText}`);
     }
   }, [refreshTree, showAlert, showConfirm]);
 
+  // ── Copy / paste / duplicate ────────────────────────────────────────────────
+
   const doCopy = useCallback((node) => setClipboard({ node }), []);
 
   const doPaste = useCallback(async (targetNode) => {
     if (!clipboard) return;
-    let destDir;
-    if (!targetNode) {
-      destDir = tree?.path;
-    } else if (targetNode.type === 'dir') {
-      destDir = targetNode.path;
-    } else {
-      destDir = getParentPath(targetNode.path);
-    }
+    const destDir = !targetNode ? tree?.path
+      : targetNode.type === 'dir' ? targetNode.path
+      : getParentPath(targetNode.path);
     if (!destDir) return;
     const res = await fetch(resolveApiUrl('/api/fs/copy'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ src: clipboard.node.path, dest_dir: destDir }),
     });
-    if (res.ok) {
-      refreshTree();
-    } else {
+    if (res.ok) refreshTree();
+    else {
       const body = await res.json().catch(() => ({}));
       showAlert(`Paste failed: ${body.error || res.statusText}`);
     }
@@ -404,9 +470,8 @@ export default function Explorer({ apiPath = '/api/fs/tree' }) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ path: node.path }),
     });
-    if (res.ok) {
-      refreshTree();
-    } else {
+    if (res.ok) refreshTree();
+    else {
       const body = await res.json().catch(() => ({}));
       showAlert(`Duplicate failed: ${body.error || res.statusText}`);
     }
@@ -418,13 +483,18 @@ export default function Explorer({ apiPath = '/api/fs/tree' }) {
 
   const doCopyRelativePath = useCallback((node) => {
     if (!tree) return;
-    const root = tree.path;
     let rel = node.path;
-    if (rel.startsWith(root)) rel = rel.slice(root.length).replace(/^[\\/]/, '');
+    if (rel.startsWith(tree.path)) rel = rel.slice(tree.path.length).replace(/^[\\/]/, '');
     navigator.clipboard.writeText(rel).catch(() => {});
   }, [tree]);
 
-  // ── Drag-and-drop ─────────────────────────────────────────────────────────────
+  // ── Drag and drop ───────────────────────────────────────────────────────────
+
+  const clearDragState = useCallback(() => {
+    setDraggingPath(null);
+    setDragOverPath(null);
+    draggingNodeRef.current = null;
+  }, []);
 
   const handleDragStart = useCallback((node) => {
     draggingNodeRef.current = node;
@@ -438,33 +508,21 @@ export default function Explorer({ apiPath = '/api/fs/tree' }) {
   const handleDrop = useCallback(async (targetNode) => {
     const srcNode = draggingNodeRef.current;
     clearDragState();
-    if (!srcNode || !targetNode) return;
-    if (srcNode.path === targetNode.path) return;
-
-    const destDir = targetNode.type === 'dir'
-      ? targetNode.path
-      : getParentPath(targetNode.path);
-
-    // Already in this directory
+    if (!srcNode || !targetNode || srcNode.path === targetNode.path) return;
+    const destDir = targetNode.type === 'dir' ? targetNode.path : getParentPath(targetNode.path);
     if (getParentPath(srcNode.path) === destDir) return;
-
-    // Can't move a directory into itself or a descendant
-    if (
-      srcNode.type === 'dir' && (
-        destDir === srcNode.path ||
-        destDir.startsWith(srcNode.path + '/') ||
-        destDir.startsWith(srcNode.path + '\\')
-      )
-    ) return;
-
+    if (srcNode.type === 'dir' && (
+      destDir === srcNode.path ||
+      destDir.startsWith(srcNode.path + '/') ||
+      destDir.startsWith(srcNode.path + '\\')
+    )) return;
     const res = await fetch(resolveApiUrl('/api/fs/move'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ src: srcNode.path, dest_dir: destDir }),
     });
-    if (res.ok) {
-      refreshTree();
-    } else {
+    if (res.ok) refreshTree();
+    else {
       const body = await res.json().catch(() => ({}));
       showAlert(`Move failed: ${body.error || res.statusText}`);
     }
@@ -472,45 +530,53 @@ export default function Explorer({ apiPath = '/api/fs/tree' }) {
 
   const handleDragEnd = useCallback(() => clearDragState(), [clearDragState]);
 
-  // Clear drag-over highlight when cursor leaves the explorer entirely
   const handleExplorerDragLeave = useCallback((e) => {
-    if (!e.currentTarget.contains(e.relatedTarget)) {
-      setDragOverPath(null);
-    }
+    if (!e.currentTarget.contains(e.relatedTarget)) setDragOverPath(null);
   }, []);
 
-  // ── Context menu ─────────────────────────────────────────────────────────────
+  // ── Context menu ────────────────────────────────────────────────────────────
 
   const getMenuItems = useCallback((node) => {
-    if (!node) {
-      return [{ label: 'Paste', action: () => doPaste(null), disabled: !clipboard }];
-    }
+    // Determine which directory "owns" this position
+    const targetDir = !node ? tree?.path
+      : node.type === 'dir' ? node.path
+      : getParentPath(node.path);
 
-    const isFile = node.type === 'file';
     const items = [];
 
-    if (isFile) {
+    items.push({ label: 'New File',   action: () => targetDir && startNewItem(targetDir, 'file') });
+    items.push({ label: 'New Folder', action: () => targetDir && startNewItem(targetDir, 'dir') });
+
+    if (!node) {
+      items.push(null);
+      items.push({ label: 'Paste', action: () => doPaste(null), disabled: !clipboard });
+      return items;
+    }
+
+    items.push(null);
+
+    if (node.type === 'file') {
       items.push({
         label: 'Open',
-        action: () => window.dispatchEvent(
-          new CustomEvent('koda.open-file', { detail: { filePath: node.path, fileName: node.name } })
-        ),
+        action: () => window.dispatchEvent(new CustomEvent('koda.open-file', {
+          detail: { filePath: node.path, fileName: node.name }
+        })),
       });
       items.push(null);
     }
 
-    items.push({ label: 'Rename', action: () => startRename(node) });
-    items.push({ label: 'Delete', action: () => doDelete(node) });
+    items.push({ label: 'Rename',    action: () => startRename(node) });
+    items.push({ label: 'Delete',    action: () => doDelete(node) });
     items.push(null);
-    items.push({ label: 'Copy', action: () => doCopy(node) });
-    items.push({ label: 'Paste', action: () => doPaste(node), disabled: !clipboard });
+    items.push({ label: 'Copy',      action: () => doCopy(node) });
+    items.push({ label: 'Paste',     action: () => doPaste(node), disabled: !clipboard });
     items.push({ label: 'Duplicate', action: () => doDuplicate(node) });
     items.push(null);
-    items.push({ label: 'Copy Path', action: () => doCopyPath(node) });
+    items.push({ label: 'Copy Path',          action: () => doCopyPath(node) });
     items.push({ label: 'Copy Relative Path', action: () => doCopyRelativePath(node) });
 
     return items;
-  }, [clipboard, startRename, doDelete, doCopy, doPaste, doDuplicate, doCopyPath, doCopyRelativePath]);
+  }, [clipboard, tree, startNewItem, startRename, doDelete, doCopy, doPaste, doDuplicate, doCopyPath, doCopyRelativePath]);
 
   const handleContextMenu = useCallback((e, node) => {
     e.preventDefault();
@@ -524,8 +590,26 @@ export default function Explorer({ apiPath = '/api/fs/tree' }) {
     dispatchContextMenu(e.clientX, e.clientY, getMenuItems(null));
   }, [getMenuItems]);
 
+  // ── Render ──────────────────────────────────────────────────────────────────
+
   if (loading) return <div className="explorer-root">Loading…</div>;
-  if (error) return <div className="explorer-root">Error: {error}</div>;
+  if (error)   return <div className="explorer-root">Error: {error}</div>;
+
+  const sharedRowProps = {
+    onContextMenu: handleContextMenu,
+    renamingPath,
+    onRenameCommit: handleRenameCommit,
+    activePath,
+    draggingPath,
+    dragOverPath,
+    onDragStart: handleDragStart,
+    onDragOver: handleDragOver,
+    onDrop: handleDrop,
+    onDragEnd: handleDragEnd,
+    newItemState,
+    onNewItemCommit: handleNewItemCommit,
+    onNewItemCancel: handleNewItemCancel,
+  };
 
   return (
     <div
@@ -535,21 +619,7 @@ export default function Explorer({ apiPath = '/api/fs/tree' }) {
       onDragLeave={handleExplorerDragLeave}
     >
       {tree ? (
-        <FileRow
-          node={tree}
-          depth={0}
-          defaultOpen={true}
-          onContextMenu={handleContextMenu}
-          renamingPath={renamingPath}
-          onRenameCommit={handleRenameCommit}
-          activePath={activePath}
-          draggingPath={draggingPath}
-          dragOverPath={dragOverPath}
-          onDragStart={handleDragStart}
-          onDragOver={handleDragOver}
-          onDrop={handleDrop}
-          onDragEnd={handleDragEnd}
-        />
+        <FileRow node={tree} depth={0} defaultOpen={true} {...sharedRowProps} />
       ) : (
         <div>No files</div>
       )}

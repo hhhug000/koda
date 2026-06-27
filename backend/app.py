@@ -618,6 +618,26 @@ async def rename_fs_item(request: Request):
         return {"error": str(e)}, 500
 
 
+@app.post("/api/fs/create")
+async def create_fs_item(request: Request):
+    """Create a new file or directory. Body: { path, type: 'file'|'dir' }."""
+    try:
+        body = await request.json()
+        path = Path(body["path"]).resolve()
+        item_type = body.get("type", "file")
+        if path.exists():
+            return {"error": f"'{path.name}' already exists"}, 409
+        if item_type == "dir":
+            path.mkdir(parents=True)
+        else:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.touch()
+        return {"success": True, "path": str(path)}
+    except Exception as e:
+        logger.exception(f"Failed to create: {e}")
+        return {"error": str(e)}, 500
+
+
 @app.post("/api/fs/move")
 async def move_fs_item(request: Request):
     """Move a file or directory into dest_dir. Body: { src, dest_dir }."""
