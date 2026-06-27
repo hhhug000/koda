@@ -3,11 +3,13 @@ import { createRoot } from 'react-dom/client';
 import { Layout } from './components/Layout';
 import MenuBar from './components/MenuBar'
 import './styles/main.scss';
+import './styles/sidebar.scss';
 import Tabs from './components/Tabs';
 import useCommunicator from './components/Communicator';
 import useTheme from './hooks/useTheme';
 import Explorer from './components/Explorer';
 import TerminalPanel from './components/TerminalPanel';
+import { Icon } from './components/Icon';
 
 // ── Layout config builder ─────────────────────────────────────────────────────
 
@@ -55,6 +57,38 @@ export const PRESETS = {
 };
 
 export const PRESET_DEFS = Object.entries(PRESETS).map(([id, p]) => ({ id, label: p.label, panels: p.panels }));
+
+// ── Sidebar panel with icon switcher bar ──────────────────────────────────────
+
+function SidebarPanel({ views }) {
+  const [activeId, setActiveId] = useState(views[0]?.id);
+
+  return (
+    <div className="sidebar-panel">
+      <div className="sidebar-bar">
+        {views.map(v => (
+          <button
+            key={v.id}
+            className={`sidebar-bar-btn${activeId === v.id ? ' sidebar-bar-btn--active' : ''}`}
+            title={v.label}
+            onClick={() => setActiveId(v.id)}
+          >
+            <Icon name={v.icon} size={16} />
+          </button>
+        ))}
+      </div>
+      {views.map(v => (
+        <div
+          key={v.id}
+          className="sidebar-content"
+          style={activeId === v.id ? undefined : { display: 'none' }}
+        >
+          {v.content}
+        </div>
+      ))}
+    </div>
+  );
+}
 
 // ── Panel components ──────────────────────────────────────────────────────────
 
@@ -131,10 +165,18 @@ function GlobalContextMenu() {
   );
 }
 
-const LeftPanel   = () => <div className="pane-content" style={{ padding: 0 }}><Explorer /></div>;
+const LeftPanel = () => (
+  <SidebarPanel views={[
+    { id: 'explorer', label: 'Explorer', icon: 'Files', content: <Explorer /> },
+  ]} />
+);
 const MiddleEditor = ({ files }) => <Tabs files={files ?? []} />;
 const MiddleTopB  = () => <TerminalPanel />;
-const RightPanel  = () => <div className="pane-content">Right Panel</div>;
+const RightPanel = () => (
+  <SidebarPanel views={[
+    { id: 'outline', label: 'Outline', icon: 'AlignLeft', content: <div className="pane-content">Right Panel</div> },
+  ]} />
+);
 
 const components = {
   left: LeftPanel,
