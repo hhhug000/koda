@@ -22,9 +22,68 @@ function LayoutThumb({ panels, large = false }) {
   );
 }
 
+function WindowControls({ api }) {
+  return (
+    <div className="window-controls">
+      <button className="wc-btn wc-minimize" onClick={() => api.minimize()} title="Minimise">
+        <Icon name="Minus" size={11} />
+      </button>
+      <button className="wc-btn wc-maximize" onClick={() => api.maximize()} title="Maximise">
+        <Icon name="Square" size={11} />
+      </button>
+      <button className="wc-btn wc-close" onClick={() => api.close()} title="Close">
+        <Icon name="X" size={11} />
+      </button>
+    </div>
+  );
+}
+
 function MenuBar({ presetDefs = [], activePanels = {}, onPanelToggle, onPresetSelect }) {
   const [open, setOpen] = useState(false);
   const wrapperRef = useRef(null);
+  const [pyApi, setPyApi] = useState(() => window.pywebview?.api ?? null);
+  const dragState = useRef(null);
+  const rafRef = useRef(null);
+  const pendingPos = useRef(null);
+
+  // Detect pywebview bridge becoming ready
+  useEffect(() => {
+    if (pyApi) return;
+    const handler = () => setPyApi(window.pywebview.api);
+    window.addEventListener('pywebviewready', handler);
+    return () => window.removeEventListener('pywebviewready', handler);
+  }, [pyApi]);
+
+  // Wire up mousemove / mouseup for window dragging
+  useEffect(() => {
+    if (!pyApi) return;
+
+    const onMouseMove = (e) => {
+      if (!dragState.current) return;
+      pendingPos.current = {
+        x: e.screenX - dragState.current.offsetX,
+        y: e.screenY - dragState.current.offsetY,
+      };
+      if (!rafRef.current) {
+        rafRef.current = requestAnimationFrame(() => {
+          if (pendingPos.current) {
+            pyApi.move(pendingPos.current.x, pendingPos.current.y);
+            pendingPos.current = null;
+          }
+          rafRef.current = null;
+        });
+      }
+    };
+
+    const onMouseUp = () => { dragState.current = null; };
+
+    document.addEventListener('mousemove', onMouseMove);
+    document.addEventListener('mouseup', onMouseUp);
+    return () => {
+      document.removeEventListener('mousemove', onMouseMove);
+      document.removeEventListener('mouseup', onMouseUp);
+    };
+  }, [pyApi]);
 
   useEffect(() => {
     if (!open) return;
@@ -42,8 +101,13 @@ function MenuBar({ presetDefs = [], activePanels = {}, onPanelToggle, onPresetSe
     p.panels.right    === (activePanels.right    ?? false)
   )?.id ?? null;
 
+  const handleDragMouseDown = pyApi
+    ? (e) => { if (e.button === 0) dragState.current = { offsetX: e.clientX, offsetY: e.clientY }; }
+    : undefined;
+
   return (
     <div className="menubar">
+      <div className="menubar-drag-region" onMouseDown={handleDragMouseDown} />
       <div className="menubar-right">
         <div className="layout-picker-wrapper" ref={wrapperRef}>
           <button
@@ -93,6 +157,7 @@ function MenuBar({ presetDefs = [], activePanels = {}, onPanelToggle, onPresetSe
             </div>
           )}
         </div>
+        {pyApi && <WindowControls api={pyApi} />}
       </div>
     </div>
   );

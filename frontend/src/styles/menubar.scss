@@ -10,13 +10,21 @@
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  padding: 0 var(--space-sm);
+  padding: 0 0 0 var(--space-sm);
+  -webkit-app-region: drag;
+}
+
+.menubar-drag-region {
+  flex: 1;
+  height: 100%;
+  -webkit-app-region: drag;
 }
 
 .menubar-right {
   display: flex;
   align-items: center;
   gap: 4px;
+  -webkit-app-region: no-drag;
 }
 
 // ── Layout picker ─────────────────────────────────────────────────────────────
@@ -209,5 +217,38 @@
   .lt-terminal {
     flex: 2;
     background: var(--bg-thumbnail-terminal);
+  }
+}
+
+// ── Window controls ───────────────────────────────────────────────────────────
+
+.window-controls {
+  display: flex;
+  align-items: stretch;
+  height: 45px;
+  margin-left: 4px;
+}
+
+.wc-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 46px;
+  height: 100%;
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: color 0.1s, background 0.1s;
+  -webkit-app-region: no-drag;
+
+  &:hover {
+    color: var(--text-primary);
+    background: var(--bg-hover-strong);
+  }
+
+  &.wc-close:hover {
+    background: rgba(196, 43, 28, 0.8);
+    color: #fff;
   }
 }

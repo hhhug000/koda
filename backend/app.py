@@ -754,12 +754,41 @@ if __name__ == "__main__":
     import time
     time.sleep(1)
     
-    # Create webview window pointing to the frontend
-    webview.create_window(
+    # Window control API exposed to JavaScript
+    class WindowControls:
+        def __init__(self):
+            self._window = None
+
+        def set_window(self, w):
+            self._window = w
+
+        def minimize(self):
+            if self._window:
+                self._window.minimize()
+
+        def maximize(self):
+            if self._window:
+                self._window.maximize()
+
+        def move(self, x, y):
+            if self._window:
+                self._window.move(int(x), int(y))
+
+        def close(self):
+            if self._window:
+                self._window.destroy()
+
+    controls = WindowControls()
+
+    # Create frameless webview window pointing to the frontend
+    window = webview.create_window(
         title=config["app"]["title"],
         url=config["server"]["frontend_url"],
-        background_color="#FFFFFF"
+        background_color="#151E2A",
+        frameless=True,
+        js_api=controls,
     )
-    
+    controls.set_window(window)
+
     # Show the window
     webview.start()
