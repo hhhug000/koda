@@ -128,7 +128,9 @@ function getLanguageFromFileName(name) {
     if (!name) return 'plaintext';
     const lower = name.toLowerCase();
     if (lower === 'dockerfile') return 'dockerfile';
-    const ext = lower.split('.').pop();
+    const dotIdx = lower.lastIndexOf('.');
+    if (dotIdx === -1) return 'plaintext';
+    const ext = lower.slice(dotIdx + 1);
     return EXTENSION_TO_LANGUAGE[ext] ?? 'plaintext';
 }
 
@@ -336,11 +338,12 @@ function parseMonacoKeybind(monaco, combo) {
 }
 
 function CodeEditor({ fileName = 'App.jsx', initialCode = DEFAULT_CODE, filePath = null }) {
-    const [source, setSource] = useState(initialCode);
+    const startingCode = filePath ? '' : initialCode;
+    const [source, setSource] = useState(startingCode);
     const [cursorPosition, setCursorPosition] = useState(null);
     const editorRef = useRef(null);
     const themeDataRef = useRef(null);
-    const savedSourceRef = useRef(initialCode);
+    const savedSourceRef = useRef(startingCode);
     const isDirtyRef = useRef(false);
     const monacoRef = useRef(null);
     const saveFileRef = useRef(null);
